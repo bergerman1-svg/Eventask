@@ -1,0 +1,2324 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Eventask — ניהול הפקה</title>
+<style>
+:root {
+  --bg: #0d0d0f; --surface: #161618; --card: #1e1e22; --card2: #252529;
+  --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+  --text: #f0f0f0; --muted: #888; --muted2: #bbb;
+  --accent: #7c5bf9; --accent2: #a78bfa; --pink: #e85ca8;
+  --blue: #3b9aec; --green: #22c55e; --amber: #f59e0b; --red: #ef4444;
+  --radius: 14px; --radius-sm: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; padding-top: 10px; }
+.hidden { display: none !important; }
+
+/* SPLASH */
+#splash { position: fixed; inset: 0; background: #0d0d0f; display: flex; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s; }
+#splash .splash-logo { animation: fadeUp 0.8s ease forwards; }
+#splash .splash-logo img { height: 80px; width: auto; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+/* TOPBAR */
+.topbar { background: #0d0d0f; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; height: 60px; }
+.topbar-inner { position: relative; height: 60px; width: 100%; }
+.topbar-logo { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; }
+.topbar-logo img { height: 28px; width: auto; display: block; }
+.topbar-ev { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); font-size: 13px; font-weight: 600; color: var(--muted2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; text-align: center; }
+.topbar-profile { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); }
+.user-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--pink)); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white; cursor: pointer; }
+
+/* NAV */
+.nav-tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.nav-tabs::-webkit-scrollbar { display: none; }
+.nav-tab { padding: 14px 20px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+.nav-tab svg { width: 16px; height: 16px; fill: currentColor; flex-shrink: 0; }
+.nav-tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
+
+/* CONTENT */
+.content { flex: 1; padding: 20px; max-width: 960px; margin: 0 auto; width: 100%; }
+
+/* PAGE HEADER */
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.page-title { font-size: 22px; font-weight: 800; }
+.page-subtitle { font-size: 13px; color: var(--muted); margin-top: 3px; }
+
+/* CARDS */
+.card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 20px; margin-bottom: 16px; }
+
+/* GRID */
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 500px) { .grid-3 { grid-template-columns: repeat(2, 1fr); } }
+
+/* STAT */
+.stat-card { background: var(--card2); border-radius: var(--radius-sm); padding: 16px; text-align: center; border: 1px solid var(--border); }
+.stat-num { font-size: 28px; font-weight: 900; }
+.stat-label { font-size: 11px; color: var(--muted); margin-top: 4px; font-weight: 600; }
+
+/* BUTTONS */
+.btn { padding: 10px 18px; border: none; border-radius: var(--radius-sm); font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.18s; }
+.btn-primary { background: linear-gradient(135deg, var(--accent), #5b3fd4); color: white; }
+.btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+.btn-ghost { background: transparent; border: 1px solid var(--border2); color: var(--muted2); }
+.btn-ghost:hover { border-color: var(--accent2); color: var(--accent2); }
+.btn-danger { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+.btn-sm { padding: 7px 12px; font-size: 12px; }
+.btn-full { width: 100%; justify-content: center; }
+
+/* FORM */
+.form-group { margin-bottom: 16px; }
+.form-label { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 7px; display: block; letter-spacing: 0.5px; text-transform: uppercase; }
+.form-input, .form-select, .form-textarea { width: 100%; padding: 12px 14px; background: var(--card2); border: 1.5px solid var(--border2); border-radius: var(--radius-sm); color: var(--text); font-size: 14px; outline: none; transition: border-color 0.2s; }
+.form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent); }
+.form-input::placeholder { color: var(--muted); }
+.form-textarea { resize: vertical; min-height: 80px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 500px) { .form-row { grid-template-columns: 1fr; } }
+
+/* EVENT CARD */
+.event-card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); padding: 20px; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; margin-bottom: 14px; }
+.event-card::before { content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 4px; background: linear-gradient(to bottom, var(--accent), var(--pink)); }
+.event-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+.event-card-img { width: 100%; height: 100px; border-radius: 8px; margin-bottom: 12px; background: var(--card2); display: flex; align-items: center; justify-content: center; font-size: 36px; overflow: hidden; }
+.event-name { font-size: 17px; font-weight: 800; margin-bottom: 5px; }
+.event-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; background: linear-gradient(135deg, var(--accent), var(--pink)); color: white; }
+.event-actions { display: flex; gap: 6px; margin-top: 12px; }
+
+/* TIMELINE */
+.timeline-day { margin-bottom: 24px; }
+.timeline-day-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.day-label { font-size: 13px; font-weight: 700; color: var(--accent2); background: rgba(124,91,249,0.15); padding: 5px 14px; border-radius: 20px; }
+.timeline-row { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 6px; }
+.time-col { font-size: 11px; font-weight: 700; color: var(--muted); min-width: 42px; padding-top: 14px; direction: ltr; text-align: right; flex-shrink: 0; }
+.timeline-items { flex: 1; }
+.schedule-item { background: var(--card2); border-radius: 10px; border: 1px solid var(--border); padding: 12px 14px; margin-bottom: 6px; border-right: 3px solid var(--accent); }
+.schedule-item-title { font-size: 14px; font-weight: 600; }
+.schedule-item-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+/* VIEW TOGGLE */
+.view-toggle { display: flex; gap: 4px; background: var(--card2); padding: 4px; border-radius: 8px; }
+.view-btn { padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; background: transparent; color: var(--muted); transition: all 0.15s; }
+.view-btn.active { background: var(--accent); color: white; }
+
+/* GANTT */
+.gantt-wrap { overflow-x: auto; }
+.gantt-table { border-collapse: collapse; min-width: 100%; }
+.gantt-table th { background: var(--card2); padding: 8px 12px; font-size: 11px; font-weight: 700; color: var(--muted); border: 1px solid var(--border); white-space: nowrap; }
+.gantt-table td { border: 1px solid var(--border); padding: 0; height: 38px; }
+.gantt-label { padding: 8px 12px; font-size: 12px; white-space: nowrap; background: var(--card2); font-weight: 600; }
+.gantt-bar { background: linear-gradient(90deg, var(--accent), var(--pink)); border-radius: 4px; height: 22px; margin: 7px 3px; opacity: 0.85; display: flex; align-items: center; padding: 0 6px; font-size: 10px; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* TASK CHIP */
+.task-chip { display: inline-flex; align-items: center; gap: 5px; background: rgba(124,91,249,0.12); border: 1px solid rgba(124,91,249,0.25); border-radius: 6px; padding: 4px 9px; font-size: 11px; color: var(--accent2); margin: 2px; cursor: pointer; transition: background 0.15s; }
+.task-chip:hover { background: rgba(124,91,249,0.22); }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+/* TASK ITEM */
+.task-item { background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 8px; }
+.task-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+.task-title { font-size: 14px; font-weight: 600; }
+.task-time { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.task-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; }
+.badge-purple { background: rgba(124,91,249,0.2); color: var(--accent2); }
+.badge-blue { background: rgba(59,154,236,0.2); color: var(--blue); }
+.badge-pink { background: rgba(232,92,168,0.2); color: var(--pink); }
+.badge-green { background: rgba(34,197,94,0.2); color: var(--green); }
+
+/* STATUS SELECT */
+.status-select { padding: 7px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; border: 1.5px solid var(--border2); background: var(--card); color: var(--text); cursor: pointer; outline: none; width: 100%; }
+.status-select[data-s="pending"] { border-color: #f59e0b; color: #f59e0b; }
+.status-select[data-s="inprogress"] { border-color: #3b9aec; color: #3b9aec; }
+.status-select[data-s="done"] { border-color: #22c55e; color: #22c55e; }
+.status-select[data-s="blocked"] { border-color: #ef4444; color: #ef4444; }
+
+/* MEMBER */
+.member-card { background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; cursor: pointer; transition: background 0.15s; }
+.member-card:hover { background: rgba(255,255,255,0.04); }
+.member-info { display: flex; align-items: center; gap: 12px; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white; flex-shrink: 0; }
+.av1 { background: linear-gradient(135deg, #7c5bf9, #e85ca8); }
+.av2 { background: linear-gradient(135deg, #3b9aec, #7c5bf9); }
+.av3 { background: linear-gradient(135deg, #22c55e, #3b9aec); }
+.av4 { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+.av5 { background: linear-gradient(135deg, #e85ca8, #f59e0b); }
+.av6 { background: linear-gradient(135deg, #6366f1, #22c55e); }
+.av7 { background: linear-gradient(135deg, #ef4444, #6366f1); }
+.av8 { background: linear-gradient(135deg, #0ea5e9, #e85ca8); }
+.member-name { font-size: 14px; font-weight: 700; }
+.member-role { font-size: 12px; color: var(--muted); }
+.member-status { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; }
+.status-available { background: rgba(34,197,94,0.15); color: var(--green); }
+.status-busy { background: rgba(239,68,68,0.15); color: var(--red); }
+.status-break { background: rgba(245,158,11,0.15); color: var(--amber); }
+
+/* PROGRESS */
+.prog-bar { height: 6px; background: rgba(255,255,255,0.07); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.prog-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--pink)); transition: width 0.5s; }
+
+/* CHAT */
+.chat-messages { height: 55vh; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.chat-msg { max-width: 75%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; }
+.chat-msg.mine { align-self: flex-end; background: linear-gradient(135deg, var(--accent), #5b3fd4); color: white; border-bottom-left-radius: 4px; }
+.chat-msg.theirs { align-self: flex-start; background: var(--card2); border: 1px solid var(--border); border-bottom-right-radius: 4px; }
+.chat-sender { font-size: 10px; font-weight: 700; color: var(--muted); margin-bottom: 3px; }
+.chat-time { font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 4px; text-align: left; }
+.chat-input-row { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
+.chat-input { flex: 1; background: var(--card2); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 13px; outline: none; }
+.chat-send-btn { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--pink)); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; color: white; }
+
+/* MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 500; display: none; align-items: flex-end; justify-content: center; backdrop-filter: blur(4px); }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--card); border-radius: 20px 20px 0 0; width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto; padding: 24px 20px 32px; border-top: 1px solid var(--border2); }
+@media (min-width: 640px) { .modal-overlay { align-items: center; } .modal { border-radius: 20px; margin: 20px; } }
+.modal-title { font-size: 18px; font-weight: 800; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+.modal-close { width: 32px; height: 32px; border-radius: 50%; background: var(--card2); border: none; cursor: pointer; color: var(--muted); font-size: 18px; display: flex; align-items: center; justify-content: center; }
+
+/* UPLOAD */
+.upload-area { border: 2px dashed var(--border2); border-radius: var(--radius-sm); padding: 28px; text-align: center; cursor: pointer; transition: all 0.2s; color: var(--muted); font-size: 13px; }
+.upload-area:hover { border-color: var(--accent); color: var(--accent2); }
+.upload-preview { width: 100%; height: 120px; border-radius: 8px; object-fit: cover; display: none; margin-top: 8px; }
+
+/* FAB */
+.fab { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, var(--accent), var(--pink)); color: white; border: none; border-radius: 50px; padding: 14px 28px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(124,91,249,0.45); z-index: 50; display: flex; align-items: center; gap: 8px; transition: all 0.2s; }
+.fab:hover { transform: translateX(-50%) translateY(-3px); }
+
+/* DAY TABS */
+.day-tabs { display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.day-tabs::-webkit-scrollbar { display: none; }
+.day-tab { padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; border: 1.5px solid var(--border2); color: var(--muted); background: transparent; flex-shrink: 0; transition: all 0.2s; }
+.day-tab.active { background: linear-gradient(135deg, var(--accent), #5b3fd4); border-color: transparent; color: white; }
+
+/* FILTER */
+.filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.filter-chip { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--border2); color: var(--muted); background: transparent; transition: all 0.2s; }
+.filter-chip.active { background: rgba(124,91,249,0.2); border-color: var(--accent); color: var(--accent2); }
+
+/* MISC */
+.divider { height: 1px; background: var(--border); margin: 16px 0; }
+.empty { text-align: center; padding: 48px 20px; color: var(--muted); }
+.empty-icon { font-size: 48px; margin-bottom: 14px; }
+.empty-title { font-size: 16px; font-weight: 700; color: var(--muted2); margin-bottom: 6px; }
+.conflict-banner { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; color: var(--amber); display: flex; align-items: flex-start; gap: 10px; }
+.has-fab { padding-bottom: 80px; }
+.date-input { color-scheme: dark; }
+
+/* TOGGLE SWITCH */
+.toggle-row { display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--border); }
+.toggle-row:last-child { border-bottom:none; }
+.toggle-info { flex:1; }
+.toggle-info .tl { font-size:13px; font-weight:600; margin-bottom:2px; }
+.toggle-info .ts { font-size:11px; color:var(--muted); }
+.toggle { position:relative; width:44px; height:24px; flex-shrink:0; }
+.toggle input { opacity:0; width:0; height:0; }
+.toggle-slider { position:absolute; inset:0; background:rgba(255,255,255,0.1); border-radius:24px; cursor:pointer; transition:0.25s; }
+.toggle-slider:before { content:''; position:absolute; width:18px; height:18px; left:3px; top:3px; background:var(--muted); border-radius:50%; transition:0.25s; }
+.toggle input:checked + .toggle-slider { background:var(--accent); }
+.toggle input:checked + .toggle-slider:before { transform:translateX(20px); background:white; }
+.profile-section { margin-bottom:20px; }
+.profile-section-title { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:10px; }
+
+/* CONFIRM DIALOG */
+.confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 900; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+.confirm-overlay.open { display: flex; }
+.confirm-box { background: var(--card); border: 1px solid var(--border2); border-radius: 16px; padding: 28px 24px; max-width: 340px; width: 90%; text-align: center; }
+.confirm-icon { font-size: 40px; margin-bottom: 12px; }
+.confirm-title { font-size: 17px; font-weight: 800; margin-bottom: 8px; }
+.confirm-msg { font-size: 13px; color: var(--muted2); margin-bottom: 20px; }
+.confirm-btns { display: flex; gap: 10px; }
+.confirm-btns button { flex: 1; }
+
+/* GO LIVE + CRITICAL PATH */
+.go-live-activity { border-right: 3px solid var(--green) !important; background: rgba(34,197,94,0.06) !important; }
+.go-live-badge { background: linear-gradient(135deg,#16a34a,#22c55e); color:white; padding:2px 10px; border-radius:20px; font-size:10px; font-weight:800; letter-spacing:0.5px; }
+.critical-badge { background: rgba(239,68,68,0.18); color:var(--red); padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; border:1px solid rgba(239,68,68,0.3); }
+.dep-badge { background: rgba(124,91,249,0.15); color:var(--accent2); padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; }
+.prod-status-card { border-radius:12px; padding:16px; margin-bottom:16px; display:flex; align-items:flex-start; gap:14px; }
+.prod-ok { background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25); }
+.prod-warn { background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); }
+.prod-danger { background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); }
+.prod-icon { font-size:32px; line-height:1; flex-shrink:0; }
+.prod-info .prod-title { font-size:15px; font-weight:800; margin-bottom:3px; }
+.prod-info .prod-sub { font-size:12px; color:var(--muted2); margin-bottom:8px; }
+.dep-chain { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; align-items:center; }
+.dep-node { font-size:11px; font-weight:600; padding:3px 9px; border-radius:6px; background:rgba(255,255,255,0.06); color:var(--muted2); }
+.dep-node.blocked { background:rgba(239,68,68,0.15); color:var(--red); }
+.dep-node.done { background:rgba(34,197,94,0.1); color:var(--green); }
+.dep-arrow { color:var(--muted); font-size:12px; }
+
+/* EDIT MODAL generic */
+.edit-label { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px; display: block; }
+
+/* DASHBOARD */
+@media (max-width: 560px) {
+  #db-kpi { grid-template-columns: repeat(2,1fr) !important; }
+  #tab-dashboard .card + .card, #tab-dashboard [style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+}
+.db-bar-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.db-bar-label { font-size:12px; font-weight:600; min-width:80px; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.db-bar-track { flex:1; height:8px; background:rgba(255,255,255,0.07); border-radius:4px; overflow:hidden; }
+.db-bar-fill { height:100%; border-radius:4px; transition:width 0.5s; }
+.db-bar-count { font-size:11px; color:var(--muted); min-width:28px; text-align:left; }
+.kpi-card { background:var(--card2); border-radius:var(--radius-sm); padding:16px 14px; border:1px solid var(--border); text-align:center; }
+.kpi-num { font-size:32px; font-weight:900; line-height:1; margin-bottom:4px; }
+.kpi-label { font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; }
+.blocked-item { background:rgba(239,68,68,0.07); border:1px solid rgba(239,68,68,0.2); border-radius:8px; padding:10px 14px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; gap:8px; cursor:pointer; }
+.blocked-item:hover { background:rgba(239,68,68,0.12); }
+
+/* TEAM SECTIONS */
+.team-section-header { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.8px; margin:20px 0 10px; display:flex; align-items:center; gap:8px; }
+.team-section-header:first-child { margin-top:0; }
+.team-section-header::after { content:''; flex:1; height:1px; background:var(--border); }
+.invite-btn { font-size:11px; font-weight:600; padding:4px 10px; border-radius:6px; background:rgba(124,91,249,0.15); border:1px solid rgba(124,91,249,0.3); color:var(--accent2); cursor:pointer; white-space:nowrap; transition:background 0.15s; }
+.invite-btn:hover { background:rgba(124,91,249,0.28); }
+.invite-pending { font-size:11px; font-weight:600; padding:4px 10px; border-radius:6px; background:rgba(245,158,11,0.12); color:var(--amber); border:1px solid rgba(245,158,11,0.25); white-space:nowrap; cursor:pointer; }
+.invite-confirmed { font-size:11px; font-weight:600; padding:4px 10px; border-radius:6px; background:rgba(34,197,94,0.12); color:var(--green); border:1px solid rgba(34,197,94,0.25); white-space:nowrap; }
+.type-radio-group { display:flex; gap:8px; }
+.type-radio-label { display:flex; align-items:center; gap:6px; cursor:pointer; padding:9px 14px; border-radius:8px; background:rgba(255,255,255,0.03); flex:1; border:1.5px solid var(--border2); transition:border-color 0.15s; font-size:13px; font-weight:600; }
+.type-radio-label:has(input:checked) { border-color:var(--accent); background:rgba(124,91,249,0.1); color:var(--accent2); }
+
+/* ===================== FIELD UI ===================== */
+#field-app { display:none; flex-direction:column; min-height:100vh; background:var(--bg); }
+.field-header { background:#0d0d0f; border-bottom:1px solid var(--border); padding:14px 20px; display:flex; align-items:center; gap:14px; position:sticky; top:0; z-index:100; }
+.field-header-logo { height:26px; width:auto; }
+.field-header-info { flex:1; min-width:0; }
+.field-header-event { font-size:12px; color:var(--muted); font-weight:600; }
+.field-header-name { font-size:15px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.field-header-avatar { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:800; color:white; flex-shrink:0; }
+.field-content { flex:1; padding:16px; padding-bottom:90px; max-width:540px; margin:0 auto; width:100%; }
+.field-bottom-nav { position:fixed; bottom:0; left:0; right:0; background:#0d0d0f; border-top:1px solid var(--border); display:flex; z-index:100; }
+.field-nav-btn { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:12px 8px; gap:4px; font-size:10px; font-weight:700; color:var(--muted); cursor:pointer; border:none; background:transparent; transition:color 0.2s; letter-spacing:0.3px; text-transform:uppercase; }
+.field-nav-btn svg { width:22px; height:22px; fill:currentColor; }
+.field-nav-btn.active { color:var(--accent2); }
+.field-nav-btn.active svg { filter:drop-shadow(0 0 6px rgba(167,139,250,0.5)); }
+.field-day-tabs { display:flex; gap:8px; margin-bottom:16px; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+.field-day-tabs::-webkit-scrollbar { display:none; }
+.field-day-tab { padding:10px 18px; border-radius:24px; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; border:1.5px solid var(--border2); color:var(--muted); background:transparent; flex-shrink:0; transition:all 0.2s; }
+.field-day-tab.active { background:linear-gradient(135deg,var(--accent),#5b3fd4); border-color:transparent; color:white; }
+.field-act-card { background:var(--card); border-radius:14px; border:1px solid var(--border); padding:16px; margin-bottom:12px; border-right:4px solid var(--accent); }
+.field-act-card.go-live { border-right-color:var(--green); background:rgba(34,197,94,0.04); }
+.field-act-time { font-size:12px; color:var(--muted); font-weight:700; margin-bottom:4px; direction:ltr; display:inline-block; }
+.field-act-name { font-size:17px; font-weight:800; margin-bottom:6px; }
+.field-act-meta { font-size:12px; color:var(--muted2); }
+.field-task-card { background:var(--card); border-radius:16px; border:1px solid var(--border); padding:18px; margin-bottom:12px; border-right:4px solid var(--accent); }
+.field-task-name { font-size:17px; font-weight:800; margin-bottom:6px; line-height:1.3; }
+.field-task-meta { font-size:12px; color:var(--muted); margin-bottom:14px; display:flex; flex-wrap:wrap; gap:6px; }
+.field-status-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.field-status-btn { padding:14px 10px; border-radius:12px; border:2px solid transparent; font-size:13px; font-weight:800; cursor:pointer; text-align:center; transition:all 0.2s; background:rgba(255,255,255,0.04); color:var(--muted); }
+.field-status-btn.active-pending   { border-color:var(--amber); background:rgba(245,158,11,0.15); color:var(--amber); }
+.field-status-btn.active-inprogress{ border-color:var(--blue);  background:rgba(59,154,236,0.15); color:var(--blue); }
+.field-status-btn.active-done      { border-color:var(--green); background:rgba(34,197,94,0.15);  color:var(--green); }
+.field-status-btn.active-blocked   { border-color:var(--red);   background:rgba(239,68,68,0.15);  color:var(--red); }
+@keyframes statusPop { 0%{transform:scale(1)} 40%{transform:scale(1.12)} 70%{transform:scale(0.96)} 100%{transform:scale(1)} }
+.field-status-btn.pop { animation:statusPop 0.32s ease; }
+.field-section-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.8px; margin:20px 0 10px; }
+.field-chat-wrap { display:flex; flex-direction:column; height:calc(100vh - 180px); }
+.field-chat-msgs { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-bottom:8px; }
+.field-chat-input-row { display:flex; gap:10px; align-items:center; padding-top:12px; border-top:1px solid var(--border); }
+.field-empty { text-align:center; padding:60px 20px; color:var(--muted); }
+.field-empty-icon { font-size:52px; margin-bottom:16px; }
+.field-empty-title { font-size:17px; font-weight:700; color:var(--muted2); margin-bottom:6px; }
+
+/* ===================== IPHONE PREVIEW ===================== */
+#modal-field-preview { align-items:center !important; background:rgba(0,0,0,1) !important; overflow-y:auto; padding:0; }
+.iphone-preview-wrap { display:flex; flex-direction:column; align-items:center; min-height:100%; padding:20px 16px 32px; gap:0; }
+.iphone-topbar { width:410px; display:flex; justify-content:flex-end; padding-bottom:12px; }
+.iphone-close-x { width:36px; height:36px; border-radius:50%; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:rgba(255,255,255,0.8); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.2s; }
+.iphone-close-x:hover { background:rgba(255,255,255,0.22); color:white; }
+/* width=410 so content area = 410-20(border) = 390px matching iPhone 14 */
+.iphone-device { width:410px; border-radius:50px; border:10px solid #2c2c2e; box-shadow:0 0 0 1px #444, 0 0 0 2px #1a1a1a, 0 40px 100px rgba(0,0,0,0.95); position:relative; background:#000; flex-shrink:0; overflow:hidden; }
+.iphone-screen { width:100%; height:844px; border:none; display:block; }
+.iphone-island { position:absolute; top:12px; left:50%; transform:translateX(-50%); width:126px; height:37px; background:#000; border-radius:20px; z-index:10; pointer-events:none; border:1.5px solid #2a2a2a; }
+.iphone-home-bar { position:absolute; bottom:8px; left:50%; transform:translateX(-50%); width:134px; height:5px; background:rgba(255,255,255,0.32); border-radius:3px; z-index:10; pointer-events:none; }
+.iphone-side-btn { position:absolute; background:#2c2c2e; border-radius:3px; }
+.iphone-side-btn.power { right:-12px; top:120px; width:4px; height:72px; }
+.iphone-side-btn.vol1 { left:-12px; top:100px; width:4px; height:48px; }
+.iphone-side-btn.vol2 { left:-12px; top:160px; width:4px; height:48px; }
+/* Field header gets top padding to clear the dynamic island (49px) */
+.field-header { padding-top:54px; }
+</style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="splash-logo"><img src="logos/Eventask-logo.png" alt="Eventask" /></div>
+</div>
+
+<div id="app" style="display:flex;flex-direction:column;min-height:100vh;">
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-logo">
+    <img src="logos/Eventask-logo.png" alt="Eventask" />
+  </div>
+  <div class="topbar-ev" id="current-event-name">—</div>
+  <div class="topbar-profile">
+    <div class="user-avatar" onclick="openProfile()">מ</div>
+  </div>
+</div>
+
+<!-- NAV TABS -->
+<div class="nav-tabs">
+  <div class="nav-tab active" onclick="goTab('events')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18,8.5a2.5,2.5,0,0,1-5,0A2.5,2.5,0,0,1,18,8.5Zm-.006,6.866a11.065,11.065,0,0,1-1.163,4.569A7.634,7.634,0,0,1,10,24H9V18.5A3.517,3.517,0,0,0,5.5,15H0V14A7.634,7.634,0,0,1,4.065,7.169,11.065,11.065,0,0,1,8.634,6.006,15.487,15.487,0,0,1,20.972,0h0A3.009,3.009,0,0,1,24,3,15.507,15.507,0,0,1,17.994,15.366ZM2.084,13H4.346A34.361,34.361,0,0,1,6.955,8.237a8.993,8.993,0,0,0-1.993.72A5.519,5.519,0,0,0,2.084,13Zm13.679,4.045A34.361,34.361,0,0,1,11,19.654v2.262a5.519,5.519,0,0,0,4.043-2.878A8.993,8.993,0,0,0,15.763,17.045ZM22,2.972A1,1,0,0,0,21,2c-5.16.147-8.65,2.124-12.018,6.822a29.92,29.92,0,0,0-2.471,4.271,5.5,5.5,0,0,1,4.4,4.4,29.92,29.92,0,0,0,4.271-2.471C19.876,11.65,21.853,8.16,22,2.972ZM6.122,17.879a3.015,3.015,0,0,1,0,4.242c-.907.906-3.622,1.465-4.748,1.664l-1.406.247.247-1.406c.2-1.126.758-3.841,1.664-4.748A3.073,3.073,0,0,1,6.122,17.879ZM5,20a.993.993,0,0,0-.293-.707,1,1,0,0,0-1.414,0A7.318,7.318,0,0,0,2.5,21.5a7.342,7.342,0,0,0,2.208-.794A.993.993,0,0,0,5,20Z"/></svg> אירועים</div>
+  <div class="nav-tab" onclick="goTab('dashboard')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M23,22H5a3,3,0,0,1-3-3V1A1,1,0,0,0,0,1V19a5.006,5.006,0,0,0,5,5H23a1,1,0,0,0,0-2Z"/><path d="M6,20a1,1,0,0,0,1-1V12a1,1,0,0,0-2,0v7A1,1,0,0,0,6,20Z"/><path d="M10,10v9a1,1,0,0,0,2,0V10a1,1,0,0,0-2,0Z"/><path d="M15,13v6a1,1,0,0,0,2,0V13a1,1,0,0,0-2,0Z"/><path d="M20,9V19a1,1,0,0,0,2,0V9a1,1,0,0,0-2,0Z"/><path d="M6,9a1,1,0,0,0,.707-.293l3.586-3.586a1.025,1.025,0,0,1,1.414,0l2.172,2.172a3,3,0,0,0,4.242,0l5.586-5.586A1,1,0,0,0,22.293.293L16.707,5.878a1,1,0,0,1-1.414,0L13.121,3.707a3,3,0,0,0-4.242,0L5.293,7.293A1,1,0,0,0,6,9Z"/></svg> דשבורד</div>
+  <div class="nav-tab" onclick="goTab('schedule')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10.5,13h-1c-.276,0-.5,.224-.5,.5s.224,.5,.5,.5h1c.276,0,.5-.224,.5-.5s-.224-.5-.5-.5Z"/><path d="M14.5,13h-1c-.276,0-.5,.224-.5,.5s.224,.5,.5,.5h1c.276,0,.5-.224,.5-.5s-.224-.5-.5-.5Z"/><path d="M18.5,13h-1c-.276,0-.5,.224-.5,.5s.224,.5,.5,.5h1c.276,0,.5-.224,.5-.5s-.224-.5-.5-.5Z"/><path d="M10.5,18h-1c-.276,0-.5,.224-.5,.5s.224,.5,.5,.5h1c.276,0,.5-.224,.5-.5s-.224-.5-.5-.5Z"/><path d="M6.5,13h-1c-.276,0-.5,.224-.5,.5s.224,.5,.5,.5h1c.276,0,.5-.224,.5-.5s-.224-.5-.5-.5Z"/><path d="M6.5,18h-1c-.276,0-.5,.224-.5,.5s.224,.5,.5,.5h1c.276,0,.5-.224,.5-.5s-.224-.5-.5-.5Z"/><path d="M14.5,18h-1c-.276,0-.5,.224-.5,.5s.224,.5,.5,.5h1c.276,0,.5-.224,.5-.5s-.224-.5-.5-.5Z"/><path d="M18.5,18h-1c-.276,0-.5,.224-.5,.5s.224,.5,.5,.5h1c.276,0,.5-.224,.5-.5s-.224-.5-.5-.5Z"/><path d="M19.5,2h-1.5V.5c0-.276-.224-.5-.5-.5s-.5,.224-.5,.5v1.5H7V.5c0-.276-.224-.5-.5-.5s-.5,.224-.5,.5v1.5h-1.5C2.019,2,0,4.019,0,6.5v13c0,2.481,2.019,4.5,4.5,4.5h15c2.481,0,4.5-2.019,4.5-4.5V6.5c0-2.481-2.019-4.5-4.5-4.5ZM4.5,3h15c1.93,0,3.5,1.57,3.5,3.5v1.5H1v-1.5c0-1.93,1.57-3.5,3.5-3.5Zm15,20H4.5c-1.93,0-3.5-1.57-3.5-3.5V9H23v10.5c0,1.93-1.57,3.5-3.5,3.5Z"/></svg> לו״ז</div>
+  <div class="nav-tab" onclick="goTab('tasks')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m4 6a2.982 2.982 0 0 1 -2.122-.879l-1.544-1.374a1 1 0 0 1 1.332-1.494l1.585 1.414a1 1 0 0 0 1.456.04l3.604-3.431a1 1 0 0 1 1.378 1.448l-3.589 3.414a2.964 2.964 0 0 1 -2.1.862zm20-2a1 1 0 0 0 -1-1h-10a1 1 0 0 0 0 2h10a1 1 0 0 0 1-1zm-17.9 9.138 3.589-3.414a1 1 0 1 0 -1.378-1.448l-3.6 3.431a1.023 1.023 0 0 1 -1.414 0l-1.59-1.585a1 1 0 0 0 -1.414 1.414l1.585 1.585a3 3 0 0 0 4.226.017zm17.9-1.138a1 1 0 0 0 -1-1h-10a1 1 0 0 0 0 2h10a1 1 0 0 0 1-1zm-17.9 9.138 3.585-3.414a1 1 0 1 0 -1.378-1.448l-3.6 3.431a1 1 0 0 1 -1.456-.04l-1.585-1.414a1 1 0 0 0 -1.332 1.494l1.544 1.374a3 3 0 0 0 4.226.017zm17.9-1.138a1 1 0 0 0 -1-1h-10a1 1 0 0 0 0 2h10a1 1 0 0 0 1-1z"/></svg> משימות</div>
+  <div class="nav-tab" onclick="goTab('team')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12,16a4,4,0,1,1,4-4A4,4,0,0,1,12,16Zm0-6a2,2,0,1,0,2,2A2,2,0,0,0,12,10Zm6,13A6,6,0,0,0,6,23a1,1,0,0,0,2,0,4,4,0,0,1,8,0,1,1,0,0,0,2,0ZM18,8a4,4,0,1,1,4-4A4,4,0,0,1,18,8Zm0-6a2,2,0,1,0,2,2A2,2,0,0,0,18,2Zm6,13a6.006,6.006,0,0,0-6-6,1,1,0,0,0,0,2,4,4,0,0,1,4,4,1,1,0,0,0,2,0ZM6,8a4,4,0,1,1,4-4A4,4,0,0,1,6,8ZM6,2A2,2,0,1,0,8,4,2,2,0,0,0,6,2ZM2,15a4,4,0,0,1,4-4A1,1,0,0,0,6,9a6.006,6.006,0,0,0-6,6,1,1,0,0,0,2,0Z"/></svg> צוות</div>
+  <div class="nav-tab" onclick="goTab('chat')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M24,11.247A12.012,12.012,0,1,0,12.017,24H19a5.005,5.005,0,0,0,5-5V11.247ZM22,19a3,3,0,0,1-3,3H12.017a10.041,10.041,0,0,1-7.476-3.343,9.917,9.917,0,0,1-2.476-7.814,10.043,10.043,0,0,1,8.656-8.761A10.564,10.564,0,0,1,12.021,2,9.921,9.921,0,0,1,18.4,4.3,10.041,10.041,0,0,1,22,11.342Z"/><path d="M8,9h4a1,1,0,0,0,0-2H8A1,1,0,0,0,8,9Z"/><path d="M16,11H8a1,1,0,0,0,0,2h8a1,1,0,0,0,0-2Z"/><path d="M16,15H8a1,1,0,0,0,0,2h8a1,1,0,0,0,0-2Z"/></svg> צ'אט</div>
+</div>
+
+<!-- EVENTS TAB -->
+<div id="tab-events" class="content has-fab">
+  <div class="page-header">
+    <div>
+      <div class="page-title" data-i18n="page.events">האירועים שלי</div>
+      <div class="page-subtitle" id="events-count"></div>
+    </div>
+  </div>
+  <div id="events-list"></div>
+  <button class="fab" onclick="openModal('modal-new-event')" data-i18n="event.new">+ צור אירוע חדש</button>
+</div>
+
+<!-- DASHBOARD TAB -->
+<div id="tab-dashboard" class="content hidden">
+  <div class="page-header">
+    <div>
+      <div class="page-title" data-i18n="page.dashboard">דשבורד</div>
+      <div class="page-subtitle" id="dashboard-event-name"></div>
+    </div>
+  </div>
+
+  <!-- Production status -->
+  <div id="db-prod-status"></div>
+
+  <!-- KPI row -->
+  <div id="db-kpi" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;"></div>
+
+  <!-- Progress bar -->
+  <div class="card" style="margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="font-size:14px;font-weight:700;" data-i18n="db.progress">התקדמות כללית</div>
+      <div id="db-pct" style="font-size:22px;font-weight:900;color:var(--accent2);">0%</div>
+    </div>
+    <div class="prog-bar" style="height:10px;"><div class="prog-fill" id="db-prog-fill" style="width:0%"></div></div>
+  </div>
+
+  <!-- Status breakdown + by assignee side by side -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+    <div class="card" style="margin-bottom:0;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:14px;" data-i18n="db.by_status">פירוט לפי סטטוס</div>
+      <div id="db-status-bars"></div>
+    </div>
+    <div class="card" style="margin-bottom:0;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:14px;" data-i18n="db.by_assignee">פירוט לפי אחראי</div>
+      <div id="db-assignee-bars"></div>
+    </div>
+  </div>
+
+  <!-- By day -->
+  <div class="card" style="margin-bottom:16px;">
+    <div style="font-size:13px;font-weight:700;margin-bottom:14px;" data-i18n="db.by_day">משימות לפי יום</div>
+    <div id="db-day-bars"></div>
+  </div>
+
+  <!-- Blocked + urgent -->
+  <div id="db-blocked-section"></div>
+</div>
+
+<!-- SCHEDULE TAB -->
+<div id="tab-schedule" class="content has-fab hidden">
+  <div class="page-header">
+    <div>
+      <div class="page-title" data-i18n="page.schedule">לוח זמנים</div>
+      <div class="page-subtitle" id="schedule-event-name"></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <div class="view-toggle">
+        <button class="view-btn active" id="view-loz" onclick="setScheduleView('loz')" data-i18n="schedule.timeline">לו״ז</button>
+        <button class="view-btn" id="view-gantt" onclick="setScheduleView('gantt')" data-i18n="schedule.gantt">גאנט</button>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="exportSchedulePDF()" data-i18n="schedule.export">📄 ייצוא PDF</button>
+      <button class="btn btn-primary btn-sm" onclick="openModal('modal-add-day')" data-i18n="schedule.add_day">+ הוסף יום</button>
+    </div>
+  </div>
+  <!-- Day filter for schedule -->
+  <div id="schedule-day-tabs" class="day-tabs" style="margin-bottom:14px;"></div>
+  <div id="schedule-days"></div>
+  <button class="fab" onclick="openModal('modal-add-activity')" data-i18n="schedule.add_act">+ הוסף פעילות</button>
+</div>
+
+<!-- TASKS TAB -->
+<div id="tab-tasks" class="content has-fab hidden">
+  <div class="page-header">
+    <div>
+      <div class="page-title" data-i18n="page.tasks">משימות</div>
+      <div class="page-subtitle" id="tasks-count"></div>
+    </div>
+  </div>
+  <div id="conflict-banners"></div>
+  <div id="task-day-tabs" class="day-tabs"></div>
+  <div class="filter-row" id="task-filter-row"></div>
+  <div id="tasks-list"></div>
+  <button class="fab" onclick="openModal('modal-add-task')" data-i18n="task.add">+ הוסף משימה</button>
+</div>
+
+<!-- TEAM TAB -->
+<div id="tab-team" class="content has-fab hidden">
+  <div class="page-header">
+    <div>
+      <div class="page-title" data-i18n="page.team">ניהול צוות</div>
+      <div class="page-subtitle" id="team-count"></div>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="openModal('modal-add-member')" data-i18n="team.add">+ הוסף חבר</button>
+  </div>
+  <div id="team-list"></div>
+</div>
+
+<!-- CHAT TAB -->
+<div id="tab-chat" class="hidden" style="display:none;flex-direction:column;flex:1;">
+  <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;overflow-x:auto;background:var(--surface);">
+    <div class="filter-chip active" onclick="selectCh(this,'group')" data-ch="group" data-i18n="chat.all">👥 כל הצוות</div>
+    <div id="dm-chips"></div>
+  </div>
+  <div class="chat-messages" id="chat-messages" style="flex:1;background:var(--bg);"></div>
+  <div class="chat-input-row" style="background:var(--surface);">
+    <input class="chat-input" id="chat-input" placeholder="כתוב הודעה..." onkeydown="if(event.key==='Enter') sendMsg()" />
+    <button class="chat-send-btn" onclick="sendMsg()">➤</button>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<!-- MODAL: Profile -->
+<div class="modal-overlay" id="modal-profile">
+  <div class="modal">
+    <div class="modal-title"><span data-i18n="prof.title">הגדרות פרופיל</span><button class="modal-close" onclick="closeModal('modal-profile')">×</button></div>
+
+    <!-- Avatar preview -->
+    <div style="display:flex;justify-content:center;margin-bottom:20px;">
+      <div id="profile-avatar-preview" style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--pink));display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:white;cursor:pointer;" onclick="document.getElementById('profile-img-input').click()">מ</div>
+      <input type="file" id="profile-img-input" accept="image/*" style="display:none" onchange="prevProfileImg(this)" />
+    </div>
+
+    <!-- Profile fields -->
+    <div class="profile-section">
+      <div class="profile-section-title" data-i18n="prof.personal">פרטים אישיים</div>
+      <div class="form-group"><label class="form-label">שם מלא</label><input class="form-input" id="prof-name" placeholder="שם מנהל ההפקה" /></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">תפקיד</label><input class="form-input" id="prof-role" placeholder="מנהל הפקה" /></div>
+        <div class="form-group"><label class="form-label">טלפון</label><input class="form-input" id="prof-phone" type="tel" placeholder="05X-XXXXXXX" /></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Notifications -->
+    <div class="profile-section" style="margin-top:16px;">
+      <div class="profile-section-title" data-i18n="prof.notif">התראות</div>
+      <div class="toggle-row">
+        <div class="toggle-info"><div class="tl">משימות חסומות</div><div class="ts">התראה כשמשימה מסומנת כחסומה</div></div>
+        <label class="toggle"><input type="checkbox" id="notif-blocked" /><span class="toggle-slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-info"><div class="tl">תזכורות פעילות</div><div class="ts">30 דק׳ לפני כל פעילות בלו״ז</div></div>
+        <label class="toggle"><input type="checkbox" id="notif-activity" /><span class="toggle-slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-info"><div class="tl">עדכוני צוות</div><div class="ts">שינויים בסטטוס חברי הצוות</div></div>
+        <label class="toggle"><input type="checkbox" id="notif-team" /><span class="toggle-slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-info"><div class="tl">הודעות צ׳אט</div><div class="ts">הודעות נכנסות בצ׳אט הצוות</div></div>
+        <label class="toggle"><input type="checkbox" id="notif-chat" /><span class="toggle-slider"></span></label>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Preferences -->
+    <div class="profile-section" style="margin-top:16px;">
+      <div class="profile-section-title" data-i18n="prof.prefs">העדפות</div>
+      <div style="margin-bottom:14px;">
+        <div class="profile-section-title" data-i18n="prof.lang">שפת מערכת</div>
+        <div class="type-radio-group">
+          <label class="type-radio-label" id="lang-he-label"><input type="radio" name="prof-lang" value="he" style="accent-color:var(--accent)" /> 🇮🇱 עברית</label>
+          <label class="type-radio-label" id="lang-en-label"><input type="radio" name="prof-lang" value="en" style="accent-color:var(--accent)" /> 🇺🇸 English</label>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-full" onclick="exportData()" style="margin-bottom:8px;" data-i18n="prof.export">📤 ייצוא נתונים (JSON)</button>
+    </div>
+
+    <button class="btn btn-primary btn-full" onclick="saveProfile()" style="margin-bottom:12px;" data-i18n="prof.save">שמור שינויים</button>
+
+    <div class="divider"></div>
+
+    <!-- Danger zone -->
+    <div class="profile-section">
+      <div class="profile-section-title" style="color:var(--red);" data-i18n="prof.danger">אזור סכנה</div>
+      <button class="btn btn-danger btn-full" onclick="resetAllData()" data-i18n="prof.reset">🗑 איפוס כל הנתונים</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- CONFIRM DIALOG -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-icon" id="confirm-icon">⚠️</div>
+    <div class="confirm-title" id="confirm-title">בטוח?</div>
+    <div class="confirm-msg" id="confirm-msg"></div>
+    <div class="confirm-btns">
+      <button class="btn btn-ghost" onclick="confirmCancel()">ביטול</button>
+      <button class="btn btn-danger" id="confirm-ok" onclick="confirmOk()">מחק</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: New / Edit Event -->
+<div class="modal-overlay" id="modal-new-event">
+  <div class="modal">
+    <div class="modal-title"><span id="event-modal-title">✨ צור אירוע חדש</span><button class="modal-close" onclick="closeModal('modal-new-event')">×</button></div>
+    <input type="hidden" id="ev-edit-id" value="" />
+    <div class="form-group"><label class="form-label">שם האירוע</label><input class="form-input" id="ev-name" placeholder="לדוגמה: ROI Summit 2026" /></div>
+    <div class="form-group">
+      <div class="form-label">מיתוג / תמונה</div>
+      <div class="upload-area" onclick="document.getElementById('ev-img-input').click()"><div style="font-size:28px;margin-bottom:6px;">🖼️</div>לחץ להעלאת תמונה</div>
+      <input type="file" id="ev-img-input" accept="image/*" style="display:none" onchange="prevImg(this)" />
+      <img id="ev-img-preview" class="upload-preview" />
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">תאריך התחלה</label><input class="form-input date-input" type="date" id="ev-start" /></div>
+      <div class="form-group"><label class="form-label">תאריך סיום</label><input class="form-input date-input" type="date" id="ev-end" /></div>
+    </div>
+    <div class="form-group"><label class="form-label">מיקום</label><input class="form-input" id="ev-location" placeholder="עיר, מלון..." /></div>
+    <div class="form-group"><label class="form-label">תיאור</label><textarea class="form-textarea" id="ev-desc" placeholder="כמה מילים..."></textarea></div>
+    <button class="btn btn-primary btn-full" id="event-modal-btn" onclick="saveEvent()">צור אירוע</button>
+  </div>
+</div>
+
+<!-- MODAL: Add Day -->
+<div class="modal-overlay" id="modal-add-day">
+  <div class="modal">
+    <div class="modal-title"><span>📅 הוסף יום</span><button class="modal-close" onclick="closeModal('modal-add-day')">×</button></div>
+    <div class="form-group"><label class="form-label">תאריך</label><input class="form-input date-input" type="date" id="day-date" /></div>
+    <div class="form-group"><label class="form-label">שם היום</label><input class="form-input" id="day-label" placeholder="הקמות, יום פתיחה, ערב גאלה..." /></div>
+    <button class="btn btn-primary btn-full" onclick="addDay()">הוסף יום</button>
+  </div>
+</div>
+
+<!-- MODAL: Add / Edit Activity -->
+<div class="modal-overlay" id="modal-add-activity">
+  <div class="modal">
+    <div class="modal-title"><span id="act-modal-title">🎯 הוסף פעילות</span><button class="modal-close" onclick="closeModal('modal-add-activity')">×</button></div>
+    <input type="hidden" id="act-edit-id" value="" />
+    <div class="form-group"><label class="form-label">יום</label><select class="form-select" id="act-day"></select></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">התחלה</label><input class="form-input" type="time" id="act-start" value="09:00" /></div>
+      <div class="form-group"><label class="form-label">סיום</label><input class="form-input" type="time" id="act-end" value="10:00" /></div>
+    </div>
+    <div class="form-group"><label class="form-label">שם הפעילות</label><input class="form-input" id="act-name" placeholder="ארוחת בוקר, Keynote, הפסקה..." /></div>
+    <div class="form-group"><label class="form-label">מיקום</label><input class="form-input" id="act-location" placeholder="אולם ראשי, לובי..." /></div>
+    <div class="toggle-row" style="margin-bottom:16px;">
+      <div class="toggle-info"><div class="tl">🚀 Go Live — תחילת האירוע</div><div class="ts">מסמן פעילות זו כ-T=0 של האירוע. כל תלויות מחושבות כלפיה.</div></div>
+      <label class="toggle"><input type="checkbox" id="act-golive" /><span class="toggle-slider"></span></label>
+    </div>
+    <button class="btn btn-primary btn-full" id="act-modal-btn" onclick="saveActivity()">הוסף פעילות</button>
+  </div>
+</div>
+
+<!-- MODAL: Add Task -->
+<div class="modal-overlay" id="modal-add-task">
+  <div class="modal">
+    <div class="modal-title"><span id="task-modal-title">✅ הוסף משימה</span><button class="modal-close" onclick="closeModal('modal-add-task')">×</button></div>
+    <input type="hidden" id="task-edit-id" value="" />
+    <div class="form-group"><label class="form-label">שם המשימה</label><input class="form-input" id="task-name" placeholder="הכנת מיקרופונים לאולם..." /></div>
+    <div class="form-group">
+      <label class="form-label">עוזרי הפקה</label>
+      <div id="task-assignees-list"></div>
+    </div>
+    <div class="form-group"><label class="form-label">פעילות בלו״ז</label><select class="form-select" id="task-activity"><option value="">— לא מקושר —</option></select></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">יום</label><select class="form-select" id="task-day-sel"><option value="">— בחר יום —</option></select></div>
+      <div class="form-group"><label class="form-label">שעה</label><input class="form-input" type="time" id="task-time" value="09:00" /></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">מיקום</label>
+      <input class="form-input" id="task-location" placeholder="אולם ראשי, לובי, חדר הפקה..." />
+    </div>
+    <div class="form-group">
+      <label class="form-label">🔗 תלויה בהשלמת</label>
+      <div id="task-deps-list" style="max-height:150px;overflow-y:auto;border:1.5px solid var(--border2);border-radius:var(--radius-sm);padding:6px;background:var(--card2);"></div>
+    </div>
+    <div class="form-group"><label class="form-label">הערות</label><textarea class="form-textarea" id="task-note" placeholder="פרטים נוספים..."></textarea></div>
+    <button class="btn btn-primary btn-full" id="task-modal-btn" onclick="saveTask()">שמור משימה</button>
+  </div>
+</div>
+
+<!-- MODAL: Add Member -->
+<div class="modal-overlay" id="modal-add-member">
+  <div class="modal">
+    <div class="modal-title"><span>👤 הוסף לצוות</span><button class="modal-close" onclick="closeModal('modal-add-member')">×</button></div>
+    <div class="form-group">
+      <label class="form-label">סוג</label>
+      <div class="type-radio-group">
+        <label class="type-radio-label"><input type="radio" name="mem-type" value="team" checked style="accent-color:var(--accent)" /> 👷 צוות הפקה</label>
+        <label class="type-radio-label"><input type="radio" name="mem-type" value="vendor" style="accent-color:var(--accent)" /> 🤝 ספק</label>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">שם מלא</label><input class="form-input" id="mem-name" placeholder="שם חבר הצוות / הספק" /></div>
+    <div class="form-group"><label class="form-label">תפקיד / שירות</label><input class="form-input" id="mem-role" placeholder="לוגיסטיקה, קייטרינג, AV..." /></div>
+    <div class="form-group"><label class="form-label">טלפון</label><input class="form-input" id="mem-phone" type="tel" placeholder="05X-XXXXXXX" /></div>
+    <button class="btn btn-primary btn-full" onclick="addMember()">הוסף לצוות</button>
+  </div>
+</div>
+
+<!-- MODAL: Member Detail -->
+<div class="modal-overlay" id="modal-member-detail">
+  <div class="modal">
+    <div class="modal-title"><span id="detail-name">פרטי חבר</span><button class="modal-close" onclick="closeModal('modal-member-detail')">×</button></div>
+    <div id="detail-body"></div>
+  </div>
+</div>
+
+<!-- MODAL: Task Detail -->
+<div class="modal-overlay" id="modal-task-detail">
+  <div class="modal">
+    <div class="modal-title"><span id="task-detail-title">פרטי משימה</span><button class="modal-close" onclick="closeModal('modal-task-detail')">×</button></div>
+    <div id="task-detail-body"></div>
+  </div>
+</div>
+
+<!-- MODAL: iPhone Field Preview -->
+<div class="modal-overlay" id="modal-field-preview" onclick="if(event.target===this)closeFieldPreview()">
+  <div class="iphone-preview-wrap">
+    <div class="iphone-topbar">
+      <button class="iphone-close-x" onclick="closeFieldPreview()" title="סגור">✕</button>
+    </div>
+    <div class="iphone-device">
+      <div class="iphone-island"></div>
+      <div class="iphone-side-btn power"></div>
+      <div class="iphone-side-btn vol1"></div>
+      <div class="iphone-side-btn vol2"></div>
+      <iframe class="iphone-screen" id="field-preview-iframe" src="" allow="same-origin"></iframe>
+      <div class="iphone-home-bar"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== I18N =====================
+const STRINGS = {
+  he: {
+    'nav.events':'אירועים','nav.dashboard':'דשבורד','nav.schedule':'לו״ז',
+    'nav.tasks':'משימות','nav.team':'צוות','nav.chat':"צ'אט",
+    'page.events':'האירועים שלי','page.dashboard':'דשבורד','page.schedule':'לוח זמנים',
+    'page.tasks':'משימות','page.team':'ניהול צוות',
+    'event.new':'+ צור אירוע חדש','event.active':'פעיל','event.days':'ימים','event.team':'אנשי צוות','event.edit':'עריכה',
+    'schedule.timeline':'לו״ז','schedule.gantt':'גאנט','schedule.add_day':'+ הוסף יום',
+    'schedule.export':'📄 ייצוא PDF','schedule.add_act':'+ הוסף פעילות','schedule.all':'הכל',
+    'schedule.no_days':'אין ימים','schedule.no_acts':'אין פעילויות — ','schedule.add':'+ הוסף',
+    'task.add':'+ הוסף משימה','task.add_short':'+ משימה','task.none':'אין משימות',
+    'task.remove_day':'🗑 הסר יום','task.no_linked':'אין משימות מקושרות',
+    'status.all':'הכל','status.pending':'ממתין','status.inprogress':'בביצוע',
+    'status.done':'הושלם','status.blocked':'חסום',
+    'status.pending_icon':'⏳ ממתין','status.inprogress_icon':'🔄 בביצוע',
+    'status.done_icon':'✅ הושלם','status.blocked_icon':'🚫 חסום',
+    'team.add':'+ הוסף חבר','team.production':'👷 צוות הפקה','team.vendors':'🤝 ספקים',
+    'team.invite':'📩 שלח הזמנה','team.pending':'⏳ ממתין לאישור','team.confirmed':'✓ חובר',
+    'team.available':'זמין','team.busy':'עסוק','team.break':'הפסקה',
+    'team.none':'אין חברי צוות','team.tasks':'משימות',
+    'chat.all':'👥 כל הצוות','chat.none':'אין הודעות עדיין',
+    'db.total':'סה״כ משימות','db.done':'הושלמו','db.inprog':'בביצוע','db.blocked':'חסומות',
+    'db.progress':'התקדמות כללית','db.by_status':'פירוט לפי סטטוס',
+    'db.by_assignee':'פירוט לפי אחראי','db.by_day':'משימות לפי יום',
+    'db.no_golive':'⚡ לא הוגדרה פעילות Go Live — ערוך פעילות בלו״ז וסמן אותה כ-Go Live',
+    'db.blocked_tasks':'🚫 משימות חסומות','db.no_team':'אין אנשי צוות','db.no_days':'אין ימים',
+    'prof.title':'הגדרות פרופיל','prof.personal':'פרטים אישיים','prof.name':'שם מלא',
+    'prof.role':'תפקיד','prof.phone':'טלפון','prof.notif':'התראות','prof.prefs':'העדפות',
+    'prof.lang':'שפת מערכת','prof.save':'שמור שינויים','prof.export':'📤 ייצוא נתונים (JSON)',
+    'prof.danger':'אזור סכנה','prof.reset':'🗑 איפוס כל הנתונים',
+    'notif.blocked':'משימות חסומות','notif.blocked_sub':'התראה כשמשימה מסומנת כחסומה',
+    'notif.activity':'תזכורות פעילות','notif.activity_sub':"30 דק׳ לפני כל פעילות בלו״ז",
+    'notif.team':'עדכוני צוות','notif.team_sub':'שינויים בסטטוס חברי הצוות',
+    'notif.chat':"הודעות צ׳אט",'notif.chat_sub':"הודעות נכנסות בצ׳אט הצוות",
+    'misc.no_events':'אין אירועים','misc.confirm_delete':'מחק','misc.cancel':'ביטול',
+  },
+  en: {
+    'nav.events':'Events','nav.dashboard':'Dashboard','nav.schedule':'Schedule',
+    'nav.tasks':'Tasks','nav.team':'Team','nav.chat':'Chat',
+    'page.events':'My Events','page.dashboard':'Dashboard','page.schedule':'Schedule',
+    'page.tasks':'Tasks','page.team':'Team Management',
+    'event.new':'+ Create New Event','event.active':'Active','event.days':'days','event.team':'team members','event.edit':'Edit',
+    'schedule.timeline':'Timeline','schedule.gantt':'Gantt','schedule.add_day':'+ Add Day',
+    'schedule.export':'📄 Export PDF','schedule.add_act':'+ Add Activity','schedule.all':'All',
+    'schedule.no_days':'No days','schedule.no_acts':'No activities — ','schedule.add':'+ Add',
+    'task.add':'+ Add Task','task.add_short':'+ Task','task.none':'No tasks',
+    'task.remove_day':'🗑 Remove Day','task.no_linked':'No linked tasks',
+    'status.all':'All','status.pending':'Pending','status.inprogress':'In Progress',
+    'status.done':'Done','status.blocked':'Blocked',
+    'status.pending_icon':'⏳ Pending','status.inprogress_icon':'🔄 In Progress',
+    'status.done_icon':'✅ Done','status.blocked_icon':'🚫 Blocked',
+    'team.add':'+ Add Member','team.production':'👷 Production Team','team.vendors':'🤝 Vendors',
+    'team.invite':'📩 Send Invite','team.pending':'⏳ Awaiting Confirmation','team.confirmed':'✓ Joined',
+    'team.available':'Available','team.busy':'Busy','team.break':'On Break',
+    'team.none':'No team members','team.tasks':'tasks',
+    'chat.all':'👥 All Team','chat.none':'No messages yet',
+    'db.total':'Total Tasks','db.done':'Completed','db.inprog':'In Progress','db.blocked':'Blocked',
+    'db.progress':'Overall Progress','db.by_status':'By Status',
+    'db.by_assignee':'By Assignee','db.by_day':'Tasks by Day',
+    'db.no_golive':'⚡ No Go Live activity defined — edit an activity in Schedule and mark it as Go Live',
+    'db.blocked_tasks':'🚫 Blocked Tasks','db.no_team':'No team members','db.no_days':'No days',
+    'prof.title':'Profile Settings','prof.personal':'Personal Details','prof.name':'Full Name',
+    'prof.role':'Role','prof.phone':'Phone','prof.notif':'Notifications','prof.prefs':'Preferences',
+    'prof.lang':'System Language','prof.save':'Save Changes','prof.export':'📤 Export Data (JSON)',
+    'prof.danger':'Danger Zone','prof.reset':'🗑 Reset All Data',
+    'notif.blocked':'Blocked Tasks','notif.blocked_sub':'Alert when a task is marked as blocked',
+    'notif.activity':'Activity Reminders','notif.activity_sub':'30 min before each scheduled activity',
+    'notif.team':'Team Updates','notif.team_sub':'Changes in team member status',
+    'notif.chat':'Chat Messages','notif.chat_sub':'Incoming messages in team chat',
+    'misc.no_events':'No events','misc.confirm_delete':'Delete','misc.cancel':'Cancel',
+  }
+};
+function tr(key) { const l=S?.profile?.lang||'he'; return (STRINGS[l]||STRINGS.he)[key]||key; }
+function setLang(lang) { if(!S.profile) S.profile={}; S.profile.lang=lang; save(); applyLang(); }
+function applyLang() {
+  const lang = S?.profile?.lang||'he';
+  const isRtl = lang==='he';
+  document.documentElement.dir = isRtl?'rtl':'ltr';
+  document.documentElement.lang = lang;
+  // Nav tab text nodes
+  const navKeys=['nav.events','nav.dashboard','nav.schedule','nav.tasks','nav.team','nav.chat'];
+  document.querySelectorAll('.nav-tab').forEach((tab,i)=>{
+    const tn=[...tab.childNodes].reverse().find(n=>n.nodeType===3&&n.textContent.trim());
+    if(tn) tn.textContent=' '+tr(navKeys[i]);
+  });
+  // data-i18n elements
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=tr(el.dataset.i18n); });
+  // Re-render active tab
+  const active=TABS.find(x=>{const el=document.getElementById('tab-'+x);return el&&!el.classList.contains('hidden')&&el.style.display!=='none';});
+  if(active==='events') renderEvents();
+  else if(active==='dashboard') renderDashboard();
+  else if(active==='schedule') renderSchedule();
+  else if(active==='tasks') renderTasks();
+  else if(active==='team') renderTeam();
+  else if(active==='chat') renderChat();
+}
+
+// ===================== STATE =====================
+const SK = 'eventask_v5';
+function load() {
+  try {
+    const d = def();
+    const saved = JSON.parse(localStorage.getItem(SK));
+    if(!saved) return d;
+    const merged = { ...d, ...saved,
+      profile: {...d.profile, ...(saved.profile||{})},
+      notifications: {...d.notifications, ...(saved.notifications||{})}
+    };
+    // Migrate old format: tasks/members/chats were at root level
+    if(saved.tasks || saved.members || saved.chats) {
+      const ev = merged.events.find(e=>e.id===merged.currentEventId) || merged.events[0];
+      if(ev) {
+        if(saved.tasks && !ev.tasks) ev.tasks = saved.tasks;
+        if(saved.members && !ev.members) ev.members = saved.members;
+        if(saved.chats && !ev.chats) ev.chats = saved.chats;
+      }
+      delete merged.tasks; delete merged.members; delete merged.chats;
+    }
+    // Ensure every event has tasks/members/chats
+    merged.events.forEach(ev => {
+      if(!ev.tasks) ev.tasks = [];
+      if(!ev.members) ev.members = [];
+      if(!ev.chats) ev.chats = { group:[] };
+      // Migrate members without type
+      ev.members.forEach(m => { if(!m.type) m.type='team'; if(m.inviteStatus===undefined) m.inviteStatus=null; });
+    });
+    return merged;
+  } catch(e) { return def(); }
+}
+function save() { try { localStorage.setItem(SK, JSON.stringify(S)); } catch(e) {} }
+
+function def() {
+  return {
+    events: [{
+      id:'ev1', name:'ROI Summit 2026', desc:'כנס מנהיגות יהודית בינלאומי', location:'ברצלונה, ספרד',
+      start:'2026-06-21', end:'2026-06-24', img:null,
+      days:[
+        {id:'d1',date:'2026-06-19',label:'הקמות'},
+        {id:'d2',date:'2026-06-21',label:"יום א' — פתיחה"},
+        {id:'d3',date:'2026-06-22',label:"יום ב' — עתיד"},
+        {id:'d4',date:'2026-06-23',label:"יום ג' — כלים"},
+        {id:'d5',date:'2026-06-24',label:"יום ד' — סיכום"},
+      ],
+      activities:[
+        {id:'a1',dayId:'d1',start:'09:00',end:'12:00',name:'כניסת ספקים',location:'לובי'},
+        {id:'a2',dayId:'d1',start:'14:00',end:'18:00',name:'הקמת אולם ראשי',location:"אולם א'"},
+        {id:'a3',dayId:'d2',start:'11:00',end:'13:00',name:'רישום משתתפים',location:'לובי'},
+        {id:'a4',dayId:'d2',start:'17:30',end:'19:00',name:'טקס פתיחה רשמי',location:'אולם ראשי'},
+        {id:'a5',dayId:'d2',start:'19:00',end:'20:30',name:'ארוחת ערב חגיגית',location:'חדר אוכל'},
+        {id:'a6',dayId:'d3',start:'09:00',end:'10:00',name:'Keynote: The Future',location:'אולם ראשי'},
+        {id:'a7',dayId:'d3',start:'18:30',end:'20:30',name:'Rooftop Dinner',location:'גג המלון'},
+        {id:'a8',dayId:'d4',start:'14:00',end:'17:00',name:'The Living Library',location:'לובי + חדרים'},
+        {id:'a9',dayId:'d4',start:'18:00',end:'20:30',name:'ערב גאלה חגיגי',location:'אולם כבוד'},
+        {id:'a10',dayId:'d5',start:'12:00',end:'14:00',name:'ארוחה ו-Checkout',location:'חדר אוכל'},
+      ],
+      tasks:[
+        {id:'t1',name:'הכנת מיקרופונים לאולם',assignees:['m1','m2'],actId:'a2',dayId:'d1',time:'08:00',status:'done',note:'לבדוק גם מיקרופוני הכנה',location:''},
+        {id:'t2',name:'קבלת פנים ורישום',assignees:['m3'],actId:'a3',dayId:'d2',time:'10:30',status:'inprogress',note:'',location:'לובי'},
+        {id:'t3',name:'תיאום עם מרצה Keynote',assignees:['m4'],actId:'a6',dayId:'d3',time:'08:00',status:'pending',note:'לשלוח PPT עד 8:00',location:''},
+        {id:'t4',name:'הכנת ארוחת ערב גג',assignees:['m1'],actId:'a7',dayId:'d3',time:'16:00',status:'blocked',note:'ממתין לאישור קייטרינג',location:'גג המלון'},
+        {id:'t5',name:'הכנת חדרי Living Library',assignees:['m3','m4'],actId:'a8',dayId:'d4',time:'10:00',status:'pending',note:''},
+        {id:'t6',name:'הדפסות חומרי רקע',assignees:['m1'],actId:null,dayId:'d1',time:'09:00',status:'done',note:'',location:'חדר הפקה'},
+        {id:'t7',name:'בדיקת מערכת קול',assignees:['m2'],actId:'a4',dayId:'d2',time:'16:00',status:'pending',note:'',location:"אולם א'"},
+        {id:'t8',name:'ארגון שולחן רישום',assignees:['m3'],actId:'a3',dayId:'d2',time:'10:00',status:'done',note:'',location:'לובי'},
+      ],
+      members:[
+        {id:'m1',name:'יעל כהן',role:'לוגיסטיקה',phone:'052-1234567',status:'available',av:'av1',type:'team',inviteStatus:null},
+        {id:'m2',name:'דני לוי',role:'טכנולוגיה',phone:'054-9876543',status:'busy',av:'av2',type:'team',inviteStatus:null},
+        {id:'m3',name:'מיכל ברק',role:'קהל ואירוח',phone:'050-1112233',status:'available',av:'av3',type:'team',inviteStatus:null},
+        {id:'m4',name:'אורי שפיר',role:'תקשורת',phone:'053-4455667',status:'break',av:'av4',type:'team',inviteStatus:null},
+        {id:'m5',name:'טופ קייטרינג',role:'קייטרינג',phone:'03-5556789',status:'available',av:'av5',type:'vendor',inviteStatus:'confirmed'},
+        {id:'m6',name:'SoundPro AV',role:'ציוד קול ואור',phone:'054-7778899',status:'available',av:'av6',type:'vendor',inviteStatus:'pending'},
+      ],
+      chats:{
+        group:[
+          {sender:'יעל כהן',text:'בוקר טוב לכולם! מוכנים ליום?',time:'07:45',mine:false},
+          {sender:'מנהל',text:'בוקר טוב! תוודאו שהמיקרופונים מוכנים עד 9:00',time:'07:50',mine:true},
+          {sender:'דני לוי',text:'מיקרופונים מוכנים ✅',time:'08:30',mine:false},
+        ],
+        m1:[{sender:'יעל כהן',text:'איך אני יכולה לעזור עם הלוגיסטיקה?',time:'08:00',mine:false}],
+        m2:[],m3:[{sender:'מיכל ברק',text:'שולחן הרישום מוכן!',time:'10:05',mine:false}],m4:[],
+      },
+    }],
+    currentEventId:'ev1',
+    _prefill:null,
+    profile:{ name:'מנהל הפקה', role:'מנהל', phone:'', initials:'מ', img:null },
+    notifications:{ blocked:true, activity:true, team:false, chat:true },
+  };
+}
+
+let S = load();
+let taskFilter = 'all', taskDayId = null;
+let scheduleView = 'loz', scheduleDayId = null;
+let _confirmCb = null;
+
+// ===================== UTILS =====================
+function getEv() { return S.events.find(e=>e.id===S.currentEventId)||S.events[0]; }
+function getTasks() { const ev=getEv(); if(!ev.tasks) ev.tasks=[]; return ev.tasks; }
+function getMembers() { const ev=getEv(); if(!ev.members) ev.members=[]; return ev.members; }
+function getChats() { const ev=getEv(); if(!ev.chats) ev.chats={group:[]}; return ev.chats; }
+function sColor(s) {
+  if(s==='done') return 'var(--green)';
+  if(s==='inprogress') return 'var(--blue)';
+  if(s==='blocked') return 'var(--red)';
+  return 'var(--amber)';
+}
+
+// ===================== DEPENDENCY ENGINE =====================
+function getGoLiveActivity() {
+  return (getEv().activities||[]).find(a=>a.goLive);
+}
+
+function buildDepGraph() {
+  // graph[taskId] = [taskIds that depend on it]
+  const graph = {};
+  getTasks().forEach(t=>{
+    (t.blockedBy||[]).forEach(bid=>{
+      if(!graph[bid]) graph[bid]=[];
+      graph[bid].push(t.id);
+    });
+  });
+  return graph;
+}
+
+function getAllCriticalTaskIds() {
+  // Critical = on path from any task → go-live activity
+  const goLiveAct = getGoLiveActivity();
+  if(!goLiveAct) return new Set();
+  const tasks = getTasks();
+  // Start from tasks linked to go-live and expand backwards through blockedBy
+  const critical = new Set(tasks.filter(t=>t.actId===goLiveAct.id).map(t=>t.id));
+  let changed = true;
+  while(changed) {
+    changed = false;
+    tasks.forEach(t=>{
+      if(!critical.has(t.id)) return;
+      (t.blockedBy||[]).forEach(bid=>{
+        if(!critical.has(bid)){ critical.add(bid); changed=true; }
+      });
+    });
+  }
+  return critical;
+}
+
+function calculateCriticalPath() {
+  const goLiveAct = getGoLiveActivity();
+  if(!goLiveAct) return { hasGoLive:false };
+  const tasks = getTasks();
+  const criticalIds = getAllCriticalTaskIds();
+  const criticalTasks = tasks.filter(t=>criticalIds.has(t.id));
+  const blockers = criticalTasks.filter(t=>t.status==='blocked');
+  const pending = criticalTasks.filter(t=>t.status==='pending'||t.status==='inprogress');
+  const done = criticalTasks.filter(t=>t.status==='done').length;
+  const risk = blockers.length ? 'high' : pending.length>0 ? 'medium' : 'low';
+  // Build impact chain for blocked tasks
+  const chains = blockers.map(blocker=>{
+    const chain = [blocker.id];
+    const graph = buildDepGraph();
+    const visit = (id, visited=new Set())=>{
+      if(visited.has(id)) return;
+      visited.add(id);
+      (graph[id]||[]).filter(d=>criticalIds.has(d)).forEach(d=>{ chain.push(d); visit(d,visited); });
+    };
+    visit(blocker.id);
+    return chain;
+  });
+  return { hasGoLive:true, goLiveAct, criticalIds, criticalTasks, blockers, pending, done, risk, chains,
+    riskIcon:{'high':'🔴','medium':'🟡','low':'🟢'}[risk],
+    riskLabel:{'high':'סיכון גבוה לעיכוב','medium':'בסיכון — יש פריטים פתוחים','low':'על המסלול'}[risk],
+    riskClass:{'high':'prod-danger','medium':'prod-warn','low':'prod-ok'}[risk],
+  };
+}
+
+// ===================== CONFIRM DIALOG =====================
+function confirm2(icon, title, msg, okLabel, cb) {
+  document.getElementById('confirm-icon').textContent = icon;
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-msg').textContent = msg;
+  document.getElementById('confirm-ok').textContent = okLabel;
+  _confirmCb = cb;
+  document.getElementById('confirm-overlay').classList.add('open');
+}
+function confirmOk() {
+  document.getElementById('confirm-overlay').classList.remove('open');
+  if(_confirmCb) { _confirmCb(); _confirmCb = null; }
+}
+function confirmCancel() {
+  document.getElementById('confirm-overlay').classList.remove('open');
+  _confirmCb = null;
+}
+
+// ===================== PROFILE =====================
+function openProfile() {
+  const p = S.profile||{};
+  const n = S.notifications||{};
+  document.getElementById('prof-name').value = p.name||'';
+  document.getElementById('prof-role').value = p.role||'';
+  document.getElementById('prof-phone').value = p.phone||'';
+  const av = document.getElementById('profile-avatar-preview');
+  if(p.img) { av.innerHTML=`<img src="${p.img}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`; }
+  else { av.textContent = p.initials||p.name?.[0]||'מ'; }
+  document.getElementById('notif-blocked').checked = !!n.blocked;
+  document.getElementById('notif-activity').checked = !!n.activity;
+  document.getElementById('notif-team').checked = !!n.team;
+  document.getElementById('notif-chat').checked = !!n.chat;
+  const lang = p.lang||'he';
+  document.querySelectorAll('input[name="prof-lang"]').forEach(r=>{ r.checked = r.value===lang; });
+  openModal('modal-profile');
+}
+
+function prevProfileImg(input) {
+  const f=input.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=e=>{
+    const av=document.getElementById('profile-avatar-preview');
+    av.innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    if(!S.profile) S.profile={};
+    S.profile.img=e.target.result;
+  };
+  r.readAsDataURL(f);
+}
+
+function saveProfile() {
+  const name=document.getElementById('prof-name').value.trim()||'מנהל הפקה';
+  const lang = document.querySelector('input[name="prof-lang"]:checked')?.value || 'he';
+  S.profile = {
+    ...S.profile,
+    name,
+    role: document.getElementById('prof-role').value.trim(),
+    phone: document.getElementById('prof-phone').value.trim(),
+    initials: name[0]||'מ',
+    lang,
+  };
+  S.notifications = {
+    blocked: document.getElementById('notif-blocked').checked,
+    activity: document.getElementById('notif-activity').checked,
+    team: document.getElementById('notif-team').checked,
+    chat: document.getElementById('notif-chat').checked,
+  };
+  save();
+  updateAvatar();
+  applyLang();
+  closeModal('modal-profile');
+}
+
+function updateAvatar() {
+  const p=S.profile||{};
+  const av=document.querySelector('.user-avatar');
+  if(!av) return;
+  if(p.img) { av.innerHTML=`<img src="${p.img}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`; }
+  else { av.textContent = p.initials||p.name?.[0]||'מ'; }
+}
+
+function exportData() {
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='eventask-export.json';
+  a.click();
+}
+
+function resetAllData() {
+  confirm2('🗑','איפוס נתונים','למחוק את כל הנתונים ולהתחיל מחדש? פעולה זו אינה הפיכה.','איפוס',()=>{
+    localStorage.removeItem(SK);
+    location.reload();
+  });
+}
+
+// ===================== TABS =====================
+const TABS=['events','dashboard','schedule','tasks','team','chat'];
+function goTab(t) {
+  TABS.forEach(x=>{
+    const el = document.getElementById('tab-'+x);
+    if(x === 'chat') {
+      el.style.display = x===t ? 'flex' : 'none';
+      el.classList.toggle('hidden', x!==t);
+    } else {
+      el.classList.toggle('hidden', x!==t);
+    }
+    document.querySelectorAll('.nav-tab')[TABS.indexOf(x)].classList.toggle('active', x===t);
+  });
+  if(t==='events') renderEvents();
+  if(t==='dashboard') renderDashboard();
+  if(t==='schedule') renderSchedule();
+  if(t==='tasks') renderTasks();
+  if(t==='team') renderTeam();
+  if(t==='chat') renderChat();
+}
+
+// ===================== EVENTS =====================
+function renderEvents() {
+  const evs = S.events;
+  document.getElementById('events-count').textContent = evs.length + ' ' + tr('nav.events').toLowerCase();
+  const el = document.getElementById('events-list');
+  if(!evs.length) { el.innerHTML=`<div class="empty"><div class="empty-icon">🎪</div><div class="empty-title">${tr('misc.no_events')}</div></div>`; return; }
+  el.innerHTML = evs.map(e=>{
+    const isActive = e.id===S.currentEventId;
+    return `<div class="event-card">
+      <div onclick="selectEv('${e.id}')" style="cursor:pointer;">
+        <div class="event-card-img">${e.img?`<img src="${e.img}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:44px;height:44px;fill:var(--accent2);opacity:0.7;"><path d="M18,8.5a2.5,2.5,0,0,1-5,0A2.5,2.5,0,0,1,18,8.5Zm-.006,6.866a11.065,11.065,0,0,1-1.163,4.569A7.634,7.634,0,0,1,10,24H9V18.5A3.517,3.517,0,0,0,5.5,15H0V14A7.634,7.634,0,0,1,4.065,7.169,11.065,11.065,0,0,1,8.634,6.006,15.487,15.487,0,0,1,20.972,0h0A3.009,3.009,0,0,1,24,3,15.507,15.507,0,0,1,17.994,15.366ZM2.084,13H4.346A34.361,34.361,0,0,1,6.955,8.237a8.993,8.993,0,0,0-1.993.72A5.519,5.519,0,0,0,2.084,13Zm13.679,4.045A34.361,34.361,0,0,1,11,19.654v2.262a5.519,5.519,0,0,0,4.043-2.878A8.993,8.993,0,0,0,15.763,17.045ZM22,2.972A1,1,0,0,0,21,2c-5.16.147-8.65,2.124-12.018,6.822a29.92,29.92,0,0,0-2.471,4.271,5.5,5.5,0,0,1,4.4,4.4,29.92,29.92,0,0,0,4.271-2.471C19.876,11.65,21.853,8.16,22,2.972ZM6.122,17.879a3.015,3.015,0,0,1,0,4.242c-.907.906-3.622,1.465-4.748,1.664l-1.406.247.247-1.406c.2-1.126.758-3.841,1.664-4.748A3.073,3.073,0,0,1,6.122,17.879ZM5,20a.993.993,0,0,0-.293-.707,1,1,0,0,0-1.414,0A7.318,7.318,0,0,0,2.5,21.5a7.342,7.342,0,0,0,2.208-.794A.993.993,0,0,0,5,20Z"/></svg>'}</div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div class="event-name">${e.name}</div>
+            <div style="font-size:12px;color:var(--muted)">📍 ${e.location||'—'} &nbsp;·&nbsp; 📅 ${e.start||'—'} → ${e.end||'—'}</div>
+            ${e.desc?`<div style="font-size:12px;color:var(--muted);margin-top:4px;">${e.desc}</div>`:''}
+          </div>
+          ${isActive?`<span class="event-badge">${tr('event.active')}</span>`:''}
+        </div>
+        <div style="font-size:12px;color:var(--muted2);margin-top:8px;">${(e.days||[]).length} ${tr('event.days')} · ${(e.members||[]).length} ${tr('event.team')}</div>
+      </div>
+      <div class="event-actions">
+        <button class="btn btn-ghost btn-sm" onclick="editEvent('${e.id}')">✏️ ${tr('event.edit')}</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteEvent('${e.id}')">🗑 ${tr('misc.confirm_delete')}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectEv(id) {
+  S.currentEventId=id; save();
+  activeCh='group';
+  taskDayId=null; taskFilter='all';
+  scheduleDayId=null;
+  document.getElementById('current-event-name').textContent = getEv()?.name||'—';
+  goTab('schedule');
+}
+
+function prevImg(input) {
+  const f=input.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=e=>{ const img=document.getElementById('ev-img-preview'); img.src=e.target.result; img.style.display='block'; };
+  r.readAsDataURL(f);
+}
+
+function openNewEvent() {
+  document.getElementById('ev-edit-id').value = '';
+  document.getElementById('event-modal-title').textContent = '✨ צור אירוע חדש';
+  document.getElementById('event-modal-btn').textContent = 'צור אירוע';
+  ['ev-name','ev-desc','ev-location','ev-start','ev-end'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ev-img-preview').style.display='none';
+  openModal('modal-new-event');
+}
+
+function editEvent(id) {
+  const ev = S.events.find(e=>e.id===id); if(!ev) return;
+  document.getElementById('ev-edit-id').value = id;
+  document.getElementById('event-modal-title').textContent = '✏️ עריכת אירוע';
+  document.getElementById('event-modal-btn').textContent = 'שמור שינויים';
+  document.getElementById('ev-name').value = ev.name||'';
+  document.getElementById('ev-desc').value = ev.desc||'';
+  document.getElementById('ev-location').value = ev.location||'';
+  document.getElementById('ev-start').value = ev.start||'';
+  document.getElementById('ev-end').value = ev.end||'';
+  const imgEl = document.getElementById('ev-img-preview');
+  if(ev.img) { imgEl.src=ev.img; imgEl.style.display='block'; } else { imgEl.style.display='none'; }
+  openModal('modal-new-event');
+}
+
+function saveEvent() {
+  const name = document.getElementById('ev-name').value.trim();
+  if(!name){alert('נא להזין שם'); return;}
+  const imgEl = document.getElementById('ev-img-preview');
+  const editId = document.getElementById('ev-edit-id').value;
+  const data = {
+    name,
+    desc: document.getElementById('ev-desc').value.trim(),
+    location: document.getElementById('ev-location').value.trim(),
+    start: document.getElementById('ev-start').value,
+    end: document.getElementById('ev-end').value,
+    img: imgEl.style.display!=='none'&&imgEl.src?imgEl.src:null,
+  };
+  if(editId) {
+    const ev = S.events.find(e=>e.id===editId); if(!ev) return;
+    Object.assign(ev, data);
+  } else {
+    const ev = {id:'ev'+Date.now(), ...data, days:[], activities:[]};
+    S.events.push(ev); S.currentEventId = ev.id;
+  }
+  save(); closeModal('modal-new-event');
+  document.getElementById('current-event-name').textContent = getEv()?.name||'—';
+  renderEvents();
+}
+
+function deleteEvent(id) {
+  const ev = S.events.find(e=>e.id===id);
+  confirm2('🗑','מחיקת אירוע',`למחוק את "${ev?.name}"? פעולה זו לא ניתנת לביטול.`,'מחק',()=>{
+    S.events = S.events.filter(e=>e.id!==id);
+    if(S.currentEventId===id) S.currentEventId = S.events[0]?.id||'';
+    save(); renderEvents();
+    document.getElementById('current-event-name').textContent = getEv()?.name||'—';
+  });
+}
+
+// ===================== SCHEDULE =====================
+function setScheduleView(v) {
+  scheduleView = v;
+  document.getElementById('view-loz').classList.toggle('active', v==='loz');
+  document.getElementById('view-gantt').classList.toggle('active', v==='gantt');
+  renderSchedule();
+}
+
+function renderSchedule() {
+  const ev=getEv(); if(!ev) return;
+  document.getElementById('schedule-event-name').textContent=ev.name;
+  const days=ev.days||[];
+
+  // Day tabs
+  let dtHtml = `<div class="day-tab ${!scheduleDayId?'active':''}" onclick="setSchDay(null)">${tr('schedule.all')}</div>`;
+  days.forEach(d=>dtHtml+=`<div class="day-tab ${scheduleDayId===d.id?'active':''}" onclick="setSchDay('${d.id}')">${d.label.split('—')[0].trim()}</div>`);
+  document.getElementById('schedule-day-tabs').innerHTML = dtHtml;
+
+  const filteredDays = scheduleDayId ? days.filter(d=>d.id===scheduleDayId) : days;
+
+  if(scheduleView==='gantt') {
+    renderGantt(ev, filteredDays);
+  } else {
+    renderLoz(ev, filteredDays);
+  }
+}
+
+function setSchDay(id) { scheduleDayId=id; renderSchedule(); }
+
+function renderLoz(ev, days) {
+  const el=document.getElementById('schedule-days');
+  if(!days.length){el.innerHTML=`<div class="empty"><div class="empty-icon">📅</div><div class="empty-title">${tr('schedule.no_days')}</div></div>`;return;}
+  el.innerHTML=days.map(d=>{
+    const acts=(ev.activities||[]).filter(a=>a.dayId===d.id).sort((a,b)=>a.start.localeCompare(b.start));
+    return `<div class="timeline-day">
+      <div class="timeline-day-header">
+        <div class="day-label">📅 ${d.label}</div>
+        <div style="font-size:12px;color:var(--muted)">${d.date}</div>
+        <button class="btn btn-ghost btn-sm" style="margin-right:auto;color:var(--red);font-size:12px;" onclick="delDay('${d.id}')">${tr('task.remove_day')}</button>
+      </div>
+      ${!acts.length?`<div style="color:var(--muted);font-size:13px;padding:8px 0;">${tr('schedule.no_acts')}<button class="btn btn-ghost btn-sm" onclick="openAddActForDay('${d.id}')">${tr('schedule.add')}</button></div>`:''}
+      ${acts.map(a=>{
+        const tasks=getTasks().filter(t=>t.actId===a.id);
+        return `<div class="timeline-row">
+          <div class="time-col">${a.start}</div>
+          <div class="timeline-items">
+            <div class="schedule-item ${a.goLive?'go-live-activity':''}">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+                <div style="flex:1;">
+                  <div class="schedule-item-title" style="display:flex;align-items:center;gap:7px;">
+                    ${a.name}
+                    ${a.goLive?'<span class="go-live-badge">🚀 GO LIVE</span>':''}
+                  </div>
+                  <div class="schedule-item-meta">${a.start}–${a.end}${a.location?' · 📍'+a.location:''}</div>
+                </div>
+                <div style="display:flex;gap:5px;flex-shrink:0;">
+                  <button class="btn btn-ghost btn-sm" onclick="editActivity('${a.id}')">✏️</button>
+                  <button class="btn btn-ghost btn-sm" onclick="qAddTask('${a.id}','${d.id}')">${tr('task.add_short')}</button>
+                  <button class="btn btn-ghost btn-sm" onclick="delAct('${a.id}')" style="color:var(--red);">🗑</button>
+                </div>
+              </div>
+              ${tasks.length?`<div style="margin-top:8px;">${tasks.map(t=>`<span class="task-chip" onclick="goToEditTask('${t.id}')"><span class="status-dot" style="background:${sColor(t.status)}"></span>${t.name}</span>`).join('')}</div>`:''}
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+function renderGantt(ev, days) {
+  const el = document.getElementById('schedule-days');
+  if(!days.length){el.innerHTML='<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">אין ימים</div></div>';return;}
+  const hours = [];
+  for(let h=6;h<=23;h++) hours.push(h.toString().padStart(2,'0')+':00');
+
+  function timeToHourIdx(t) {
+    if(!t) return null;
+    const [hh] = t.split(':').map(Number);
+    const idx = hh - 6;
+    return (idx >= 0 && idx < hours.length) ? idx : null;
+  }
+  function timeToCell(t) {
+    const [hh,mm] = t.split(':').map(Number);
+    return (hh-6)*60+mm;
+  }
+
+  const statusLabel = {pending:'ממתין',inprogress:'בביצוע',done:'הושלם',blocked:'חסום'};
+
+  let html = `<div class="gantt-wrap"><table class="gantt-table"><thead><tr>
+    <th style="min-width:140px;text-align:right;">פעילות / משימה</th>`;
+  hours.forEach(h=>html+=`<th style="min-width:52px;">${h}</th>`);
+  html += `</tr></thead><tbody>`;
+
+  days.forEach(d=>{
+    const acts=(ev.activities||[]).filter(a=>a.dayId===d.id).sort((a,b)=>a.start.localeCompare(b.start));
+    html+=`<tr><td class="gantt-label" colspan="${hours.length+1}" style="background:rgba(124,91,249,0.1);color:var(--accent2);font-size:11px;">📅 ${d.label}</td></tr>`;
+
+    acts.forEach(a=>{
+      // Activity header row — shaded span showing activity window
+      const actStart = timeToCell(a.start);
+      const actEnd   = timeToCell(a.end);
+      html += `<tr style="background:rgba(255,255,255,0.015);">
+        <td class="gantt-label" style="font-size:11px;color:var(--muted2);padding-right:16px;">
+          ${a.goLive?'🚀 ':''}${a.name}
+          <div style="font-size:10px;color:var(--muted)">${a.start}–${a.end}</div>
+        </td>`;
+      for(let i=0;i<hours.length;i++){
+        const slotStart=i*60; const slotEnd=(i+1)*60;
+        const inWindow = actStart < slotEnd && actEnd > slotStart;
+        html += `<td style="padding:0;background:${inWindow?'rgba(124,91,249,0.07)':''}"></td>`;
+      }
+      html += `</tr>`;
+
+      // One row per task linked to this activity
+      const actTasks = getTasks().filter(t=>t.actId===a.id);
+      if(!actTasks.length) {
+        html += `<tr><td style="padding:6px 16px 6px 20px;font-size:11px;color:var(--muted);font-style:italic;" colspan="${hours.length+1}">${tr('task.no_linked')}</td></tr>`;
+      }
+      actTasks.forEach(t=>{
+        const hourIdx = timeToHourIdx(t.time);
+        const color = sColor(t.status);
+        html += `<tr>
+          <td class="gantt-label" style="padding-right:24px;font-size:12px;">
+            <span class="status-dot" style="background:${color};display:inline-block;margin-left:5px;"></span>${t.name}
+          </td>`;
+        for(let i=0;i<hours.length;i++){
+          const inWindow = actStart < (i+1)*60 && actEnd > i*60;
+          if(i===hourIdx){
+            html += `<td style="padding:0;background:${inWindow?'rgba(124,91,249,0.07)':''}">
+              <div style="background:${color};opacity:0.85;border-radius:4px;height:20px;margin:5px 2px;display:flex;align-items:center;padding:0 5px;font-size:10px;color:white;white-space:nowrap;overflow:hidden;cursor:pointer;" onclick="goToEditTask('${t.id}')" title="${t.name} · ${statusLabel[t.status]||t.status}">${t.name}</div>
+            </td>`;
+          } else {
+            html += `<td style="padding:0;background:${inWindow?'rgba(124,91,249,0.07)':''}"></td>`;
+          }
+        }
+        html += `</tr>`;
+      });
+    });
+  });
+  html += `</tbody></table></div>`;
+  el.innerHTML = html;
+}
+
+async function exportSchedulePDF() {
+  const ev = getEv(); if(!ev) return;
+  const days = scheduleDayId ? (ev.days||[]).filter(d=>d.id===scheduleDayId) : (ev.days||[]);
+
+  // Embed logo as base64 so it renders in the new window
+  let logoHtml = `<span style="font-size:20px;font-weight:900;color:#7c5bf9;letter-spacing:-1px;">Eventask</span>`;
+  try {
+    const resp = await fetch('logos/Eventask-logo.png');
+    const blob = await resp.blob();
+    const dataUrl = await new Promise(res => { const r=new FileReader(); r.onload=e=>res(e.target.result); r.readAsDataURL(blob); });
+    logoHtml = `<img src="${dataUrl}" style="height:36px;width:auto;" />`;
+  } catch(e) {}
+  const tasks = ev.tasks || [];
+  const memberMap = {};
+  (ev.members||[]).forEach(m=>{ memberMap[m.id]=m.name; });
+  const statusColor = {done:'#16a34a',inprogress:'#2563eb',pending:'#d97706',blocked:'#dc2626'};
+  const statusLabel = {done:'הושלם',inprogress:'בביצוע',pending:'ממתין',blocked:'חסום'};
+
+  const daysHtml = days.map(d=>{
+    const acts = (ev.activities||[]).filter(a=>a.dayId===d.id).sort((a,b)=>a.start.localeCompare(b.start));
+    const actsHtml = acts.map(a=>{
+      const actTasks = tasks.filter(t=>t.actId===a.id);
+      const taskHtml = actTasks.length ? `
+        <div style="margin-top:8px;padding-top:7px;border-top:1px solid #f0f0f0;display:flex;flex-wrap:wrap;gap:4px;">
+          ${actTasks.map(t=>{
+            const names = (t.assignees||[]).map(id=>memberMap[id]).filter(Boolean).join(', ');
+            return `<span style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid ${statusColor[t.status]||'#ccc'};color:${statusColor[t.status]||'#555'};">
+              ${t.name}${names?' · '+names:''}${t.time?' · '+t.time:''}
+            </span>`;
+          }).join('')}
+        </div>` : '';
+      return `<div style="display:flex;gap:12px;margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:700;color:#888;min-width:42px;padding-top:4px;direction:ltr;text-align:right;flex-shrink:0;">${a.start}</div>
+        <div style="flex:1;border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;border-right:3px solid ${a.goLive?'#22c55e':'#7c5bf9'};${a.goLive?'background:rgba(34,197,94,0.04);':''}">
+          <div style="font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;">
+            ${a.goLive?'<span style="background:linear-gradient(135deg,#16a34a,#22c55e);color:white;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:800;">🚀 GO LIVE</span>':''}
+            ${a.name}
+          </div>
+          <div style="font-size:11px;color:#888;margin-top:2px;">${a.start}–${a.end}${a.location?' · 📍 '+a.location:''}</div>
+          ${taskHtml}
+        </div>
+      </div>`;
+    }).join('');
+    return `<div style="margin-bottom:28px;page-break-inside:avoid;">
+      <div style="font-size:13px;font-weight:800;color:#7c5bf9;background:rgba(124,91,249,0.08);padding:6px 14px;border-radius:20px;display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;">
+        📅 ${d.label} <span style="font-weight:400;color:#888;font-size:11px;">${d.date}</span>
+      </div>
+      ${actsHtml||'<div style="color:#bbb;font-size:12px;padding:6px 0;">אין פעילויות</div>'}
+    </div>`;
+  }).join('');
+
+  const exportDate = new Date().toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const html = `<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
+<title>לו״ז — ${ev.name}</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,Arial,sans-serif; direction:rtl; color:#111; background:white; }
+  .page { padding:32px 40px; max-width:900px; margin:0 auto; }
+  @media print {
+    body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .no-print { display:none !important; }
+    .page { padding:20px 28px; }
+  }
+</style>
+</head><body><div class="page">
+
+  <!-- HEADER -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;background:#0d0d0f;border-radius:12px;padding:14px 20px;direction:ltr;">
+    <div style="padding:4px 8px;display:flex;align-items:center;">${logoHtml}</div>
+    <div style="text-align:right;direction:rtl;">
+      <div style="font-size:20px;font-weight:900;color:#f0f0f0;">${ev.name}</div>
+      <div style="font-size:12px;color:#aaa;margin-top:3px;">📍 ${ev.location||'—'} &nbsp;·&nbsp; 📅 ${ev.start||'—'} → ${ev.end||'—'}</div>
+      ${ev.desc?`<div style="font-size:11px;color:#888;margin-top:2px;">${ev.desc}</div>`:''}
+    </div>
+  </div>
+
+  <!-- DAYS -->
+  ${daysHtml||'<div style="color:#aaa;text-align:center;padding:40px;">אין ימים בלו״ז</div>'}
+
+  <!-- FOOTER -->
+  <div style="margin-top:36px;border-top:1px solid #e5e7eb;padding-top:12px;display:flex;justify-content:space-between;font-size:10px;color:#aaa;">
+    <span>הופק על ידי <strong style="color:#7c5bf9;">Eventask</strong></span>
+    <span>תאריך הפקה: ${exportDate}</span>
+  </div>
+
+  <!-- PRINT BUTTON (hidden on print) -->
+  <div class="no-print" style="text-align:center;margin-top:28px;">
+    <button onclick="window.print()" style="padding:12px 32px;background:linear-gradient(135deg,#7c5bf9,#5b3fd4);color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ הדפס / שמור כ-PDF</button>
+  </div>
+
+</div><script>setTimeout(()=>window.print(),400);<\/script></body></html>`;
+
+  const w = window.open('','_blank','width=900,height=700');
+  if(!w){ alert('אנא אשר פתיחת חלון חדש בדפדפן'); return; }
+  w.document.write(html);
+  w.document.close();
+}
+
+function addDay() {
+  const date=document.getElementById('day-date').value;
+  const label=document.getElementById('day-label').value.trim();
+  if(!date||!label){alert('נא למלא תאריך ושם');return;}
+  const ev=getEv(); if(!ev) return;
+  if(!ev.days) ev.days=[];
+  ev.days.push({id:'d'+Date.now(),date,label});
+  ev.days.sort((a,b)=>a.date.localeCompare(b.date));
+  save(); closeModal('modal-add-day');
+  document.getElementById('day-date').value=''; document.getElementById('day-label').value='';
+  renderSchedule();
+}
+
+function delDay(id) {
+  const ev=getEv(); if(!ev) return;
+  confirm2('📅','הסרת יום','להסיר יום זה ואת כל הפעילויות שלו?','הסר',()=>{
+    ev.days=ev.days.filter(d=>d.id!==id);
+    ev.activities=(ev.activities||[]).filter(a=>a.dayId!==id);
+    getEv().tasks=getTasks().filter(t=>t.dayId!==id);
+    save(); renderSchedule();
+  });
+}
+
+function populateActDaySel(prefillDayId) {
+  const ev=getEv(); const sel=document.getElementById('act-day');
+  sel.innerHTML='<option value="">— בחר יום —</option>';
+  (ev?.days||[]).forEach(d=>sel.innerHTML+=`<option value="${d.id}" ${d.id===prefillDayId?'selected':''}>${d.label} (${d.date})</option>`);
+}
+
+function openAddActForDay(dayId) {
+  document.getElementById('act-edit-id').value = '';
+  document.getElementById('act-modal-title').textContent = '🎯 הוסף פעילות';
+  document.getElementById('act-modal-btn').textContent = 'הוסף פעילות';
+  populateActDaySel(dayId);
+  document.getElementById('act-name').value=''; document.getElementById('act-location').value='';
+  document.getElementById('act-start').value='09:00'; document.getElementById('act-end').value='10:00';
+  openModal('modal-add-activity');
+}
+
+function editActivity(id) {
+  const ev=getEv(); if(!ev) return;
+  const act=(ev.activities||[]).find(a=>a.id===id); if(!act) return;
+  document.getElementById('act-edit-id').value = id;
+  document.getElementById('act-modal-title').textContent = '✏️ עריכת פעילות';
+  document.getElementById('act-modal-btn').textContent = 'שמור שינויים';
+  populateActDaySel(act.dayId);
+  document.getElementById('act-name').value = act.name||'';
+  document.getElementById('act-location').value = act.location||'';
+  document.getElementById('act-start').value = act.start||'09:00';
+  document.getElementById('act-end').value = act.end||'10:00';
+  document.getElementById('act-golive').checked = !!act.goLive;
+  openModal('modal-add-activity');
+}
+
+function saveActivity() {
+  const dayId=document.getElementById('act-day').value;
+  const name=document.getElementById('act-name').value.trim();
+  if(!dayId||!name){alert('נא למלא יום ושם');return;}
+  const ev=getEv(); if(!ev) return;
+  if(!ev.activities) ev.activities=[];
+  const editId = document.getElementById('act-edit-id').value;
+  const goLive = document.getElementById('act-golive').checked;
+  const data = {dayId, start:document.getElementById('act-start').value, end:document.getElementById('act-end').value, name, location:document.getElementById('act-location').value.trim(), goLive};
+  // Only one go-live allowed
+  if(goLive) ev.activities.forEach(a=>{ if(a.id!==(editId||null)) a.goLive=false; });
+  if(editId) {
+    const act = ev.activities.find(a=>a.id===editId); if(!act) return;
+    Object.assign(act, data);
+  } else {
+    ev.activities.push({id:'a'+Date.now(), ...data});
+  }
+  save(); closeModal('modal-add-activity');
+  document.getElementById('act-name').value=''; document.getElementById('act-location').value='';
+  renderSchedule();
+}
+
+function delAct(id) {
+  const ev=getEv(); if(!ev) return;
+  confirm2('🎯','הסרת פעילות','להסיר פעילות זו?','הסר',()=>{
+    ev.activities=(ev.activities||[]).filter(a=>a.id!==id);
+    getEv().tasks=getTasks().map(t=>t.actId===id?{...t,actId:null}:t);
+    save(); renderSchedule();
+  });
+}
+
+function qAddTask(actId,dayId) {
+  S._prefill={actId,dayId}; openModal('modal-add-task');
+}
+
+// ===================== DASHBOARD =====================
+function renderDashboard() {
+  const ev = getEv();
+  document.getElementById('dashboard-event-name').textContent = ev?.name || '';
+
+  // Production status block
+  const cp = calculateCriticalPath();
+  const dbKpi = document.getElementById('db-kpi');
+  const statusHtml = cp.hasGoLive ? (()=>{
+    const tasks = getTasks();
+    const chainHtml = cp.blockers.map(bl=>{
+      const depChain = [bl, ...cp.chains.flat().filter(id=>id!==bl.id).map(id=>tasks.find(t=>t.id===id)).filter(Boolean)];
+      return `<div class="dep-chain">
+        ${[...new Set(depChain.map(t=>typeof t==='string'?tasks.find(x=>x.id===t):t))].filter(Boolean).map(t=>
+          `<span class="dep-node ${t.status==='blocked'?'blocked':t.status==='done'?'done':''}">${t.name}</span><span class="dep-arrow">→</span>`
+        ).join('')}
+        <span class="dep-node" style="background:rgba(34,197,94,0.15);color:var(--green);">🚀 ${cp.goLiveAct.name} ${cp.goLiveAct.start}</span>
+      </div>`;
+    }).join('');
+    return `<div class="prod-status-card ${cp.riskClass}" style="margin-bottom:20px;">
+      <div class="prod-icon">${cp.riskIcon}</div>
+      <div class="prod-info" style="flex:1;">
+        <div class="prod-title">${cp.riskLabel}</div>
+        <div class="prod-sub">🚀 Go Live: <strong>${cp.goLiveAct.name}</strong> · ${cp.goLiveAct.start} &nbsp;|&nbsp; ${cp.criticalTasks.length} משימות קריטיות · ${cp.done} הושלמו</div>
+        ${cp.blockers.length ? `<div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:4px;">משימות חוסמות:</div>${chainHtml}` : ''}
+      </div>
+    </div>`;
+  })() : `<div style="padding:12px 0;font-size:13px;color:var(--muted);text-align:center;margin-bottom:16px;">${tr('db.no_golive')}</div>`;
+
+  document.getElementById('db-prod-status').innerHTML = statusHtml;
+
+  const tasks = getTasks();
+  const total = tasks.length;
+  const done = tasks.filter(t=>t.status==='done').length;
+  const inprog = tasks.filter(t=>t.status==='inprogress').length;
+  const pending = tasks.filter(t=>t.status==='pending').length;
+  const blocked = tasks.filter(t=>t.status==='blocked').length;
+  const pct = total ? Math.round(done/total*100) : 0;
+
+  // KPI
+  document.getElementById('db-kpi').innerHTML = `
+    <div class="kpi-card"><div class="kpi-num">${total}</div><div class="kpi-label">${tr('db.total')}</div></div>
+    <div class="kpi-card"><div class="kpi-num" style="color:var(--green)">${done}</div><div class="kpi-label">${tr('db.done')}</div></div>
+    <div class="kpi-card"><div class="kpi-num" style="color:var(--blue)">${inprog}</div><div class="kpi-label">${tr('db.inprog')}</div></div>
+    <div class="kpi-card"><div class="kpi-num" style="color:var(--red)">${blocked}</div><div class="kpi-label">${tr('db.blocked')}</div></div>
+  `;
+
+  // Progress
+  document.getElementById('db-pct').textContent = pct + '%';
+  document.getElementById('db-prog-fill').style.width = pct + '%';
+
+  // Status bars
+  const statuses = [
+    {key:'done', label:tr('status.done'), color:'var(--green)', count:done},
+    {key:'inprogress', label:tr('status.inprogress'), color:'var(--blue)', count:inprog},
+    {key:'pending', label:tr('status.pending'), color:'var(--amber)', count:pending},
+    {key:'blocked', label:tr('status.blocked'), color:'var(--red)', count:blocked},
+  ];
+  document.getElementById('db-status-bars').innerHTML = statuses.map(s=>`
+    <div class="db-bar-row" onclick="goTab('tasks');setTFilter('${s.key}')" style="cursor:pointer;">
+      <div class="db-bar-label">${s.label}</div>
+      <div class="db-bar-track"><div class="db-bar-fill" style="width:${total?Math.round(s.count/total*100):0}%;background:${s.color};"></div></div>
+      <div class="db-bar-count">${s.count}</div>
+    </div>`).join('');
+
+  // Assignee bars
+  const assigneeRows = getMembers().map(m=>{
+    const mt = tasks.filter(t=>(t.assignees||[]).includes(m.id));
+    const md = mt.filter(t=>t.status==='done').length;
+    return {name:m.name, total:mt.length, done:md, pct:mt.length?Math.round(md/mt.length*100):0};
+  }).sort((a,b)=>b.total-a.total);
+  document.getElementById('db-assignee-bars').innerHTML = assigneeRows.map(r=>`
+    <div class="db-bar-row">
+      <div class="db-bar-label" style="max-width:90px;">${r.name}</div>
+      <div class="db-bar-track"><div class="db-bar-fill" style="width:${r.pct}%;background:linear-gradient(90deg,var(--accent),var(--pink));"></div></div>
+      <div class="db-bar-count" style="min-width:44px;">${r.done}/${r.total}</div>
+    </div>`).join('') || `<div style="color:var(--muted);font-size:13px;">${tr('db.no_team')}</div>`;
+
+  // By day bars
+  const days = ev?.days || [];
+  const dayRows = days.map(d=>{
+    const dt = tasks.filter(t=>t.dayId===d.id);
+    const dd = dt.filter(t=>t.status==='done').length;
+    return {label:d.label.split('—')[0].trim(), id:d.id, total:dt.length, done:dd, pct:dt.length?Math.round(dd/dt.length*100):0};
+  });
+  const maxDayTotal = Math.max(1, ...dayRows.map(r=>r.total));
+  document.getElementById('db-day-bars').innerHTML = dayRows.length ? dayRows.map(r=>`
+    <div class="db-bar-row" onclick="goTab('tasks');setTDay('${r.id}')" style="cursor:pointer;">
+      <div class="db-bar-label" style="min-width:90px;">${r.label}</div>
+      <div class="db-bar-track">
+        <div class="db-bar-fill" style="width:${Math.round(r.total/maxDayTotal*100)}%;background:rgba(124,91,249,0.35);position:relative;">
+          <div style="position:absolute;top:0;right:0;height:100%;width:${r.total?Math.round(r.done/r.total*100):0}%;background:var(--accent);border-radius:4px;"></div>
+        </div>
+      </div>
+      <div class="db-bar-count" style="min-width:44px;">${r.done}/${r.total}</div>
+    </div>`).join('')
+    : '<div style="color:var(--muted);font-size:13px;">אין ימים</div>';
+
+  // Blocked tasks
+  const blockedTasks = tasks.filter(t=>t.status==='blocked');
+  document.getElementById('db-blocked-section').innerHTML = blockedTasks.length ? `
+    <div class="card">
+      <div style="font-size:13px;font-weight:700;color:var(--red);margin-bottom:12px;">🚫 משימות חסומות (${blockedTasks.length})</div>
+      ${blockedTasks.map(t=>{
+        const names=(t.assignees||[]).map(id=>getMembers().find(m=>m.id===id)?.name).filter(Boolean);
+        return `<div class="blocked-item" onclick="goToEditTask('${t.id}')">
+          <div>
+            <div style="font-size:13px;font-weight:600;">${t.name}</div>
+            ${t.note?`<div style="font-size:11px;color:var(--muted);margin-top:2px;">${t.note}</div>`:''}
+          </div>
+          <div style="text-align:left;flex-shrink:0;">
+            ${names.map(n=>`<span class="badge badge-purple" style="display:inline-block;margin-bottom:2px;">${n}</span>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+}
+
+// ===================== TASKS =====================
+function renderTasks() {
+  const ev=getEv(); const days=ev?ev.days||[]:[];
+
+  // Day tabs
+  let dtHtml=`<div class="day-tab ${!taskDayId?'active':''}" onclick="setTDay(null)">${tr('schedule.all')}</div>`;
+  days.forEach(d=>dtHtml+=`<div class="day-tab ${taskDayId===d.id?'active':''}" onclick="setTDay('${d.id}')">${d.label.split('—')[0].trim()}</div>`);
+  document.getElementById('task-day-tabs').innerHTML = dtHtml;
+
+  // Filter chips
+  const filters=['all','pending','inprogress','done','blocked'];
+  const fLabels={all:tr('status.all'),pending:tr('status.pending'),inprogress:tr('status.inprogress'),done:tr('status.done'),blocked:tr('status.blocked')};
+  document.getElementById('task-filter-row').innerHTML=
+    filters.map(f=>`<div class="filter-chip ${taskFilter===f?'active':''}" onclick="setTFilter('${f}')">${fLabels[f]}</div>`).join('');
+
+  // Conflicts
+  const conflicts=detectConflicts();
+  document.getElementById('conflict-banners').innerHTML=conflicts.map(c=>`<div class="conflict-banner">⚠️ <div><strong>שים לב!</strong> ${c.name} משוייך/ת ל-${c.count} משימות באותה שעה (${c.time})</div></div>`).join('');
+
+  // Tasks
+  let tasks=getTasks();
+  if(taskDayId) tasks=tasks.filter(t=>t.dayId===taskDayId);
+  if(taskFilter!=='all') tasks=tasks.filter(t=>t.status===taskFilter);
+  tasks=tasks.sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+  document.getElementById('tasks-count').textContent=tasks.length+' משימות';
+  const el=document.getElementById('tasks-list');
+  if(!tasks.length){el.innerHTML=`<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">${tr('task.none')}</div></div>`;return;}
+
+  const cp = calculateCriticalPath();
+  el.innerHTML=tasks.map(t=>{
+    const aNames=(t.assignees||[]).map(id=>getMembers().find(m=>m.id===id)?.name).filter(Boolean);
+    const act=ev?(ev.activities||[]).find(a=>a.id===t.actId):null;
+    const day=ev?(ev.days||[]).find(d=>d.id===t.dayId):null;
+    const isCritical = cp.criticalIds?.has(t.id) && t.status!=='done';
+    const depNames = (t.blockedBy||[]).map(bid=>{ const bt=getTasks().find(x=>x.id===bid); return bt?bt.name:''; }).filter(Boolean);
+    const hasOpenDeps = (t.blockedBy||[]).some(bid=>{ const bt=getTasks().find(x=>x.id===bid); return bt&&bt.status!=='done'; });
+    return `<div class="task-item" style="border-right:3px solid ${sColor(t.status)}${isCritical?';box-shadow:0 0 0 1px rgba(239,68,68,0.2)':''}">
+      <div class="task-header">
+        <div style="flex:1;min-width:0;">
+          <div class="task-title" style="cursor:pointer;display:flex;align-items:center;gap:6px;flex-wrap:wrap;" onclick="openTaskDetail('${t.id}')">
+            ${t.name}
+            ${isCritical?'<span class="critical-badge">⚡ קריטי</span>':''}
+            ${depNames.length?`<span class="dep-badge">🔗 ${depNames.length}</span>`:''}
+          </div>
+          ${hasOpenDeps?`<div style="font-size:11px;color:var(--amber);margin-top:3px;">⚠️ ממתין ל: ${depNames.join(', ')}</div>`:''}
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+          <span class="task-time">${t.time||''}</span>
+          <button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;padding:2px 4px;" onclick="editTask('${t.id}')">✏️</button>
+          <button style="background:none;border:none;cursor:pointer;color:var(--red);font-size:18px;line-height:1;" onclick="delTask('${t.id}')">×</button>
+        </div>
+      </div>
+      <div class="task-meta">
+        ${aNames.map(n=>`<span class="badge badge-purple">${n}</span>`).join('')}
+        ${act?`<span class="badge badge-blue">${act.name}</span>`:''}
+        ${day?`<span class="badge badge-pink">${day.label}</span>`:''}
+        ${t.location?`<span class="badge" style="background:rgba(255,255,255,0.06);color:var(--muted2);">📍${t.location}</span>`:''}
+      </div>
+      ${t.note?`<div style="font-size:12px;color:var(--muted);margin-bottom:8px;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;">${t.note}</div>`:''}
+      <select class="status-select" data-s="${t.status}" onchange="updTaskStatus('${t.id}',this.value,this)">
+        <option value="pending" ${t.status==='pending'?'selected':''}>${tr('status.pending_icon')}</option>
+        <option value="inprogress" ${t.status==='inprogress'?'selected':''}>${tr('status.inprogress_icon')}</option>
+        <option value="done" ${t.status==='done'?'selected':''}>${tr('status.done_icon')}</option>
+        <option value="blocked" ${t.status==='blocked'?'selected':''}>${tr('status.blocked_icon')}</option>
+      </select>
+    </div>`;
+  }).join('');
+}
+
+function openTaskDetail(id) {
+  const t = getTasks().find(t=>t.id===id); if(!t) return;
+  const ev=getEv();
+  const aNames=(t.assignees||[]).map(aid=>getMembers().find(m=>m.id===aid)?.name).filter(Boolean);
+  const act=ev?(ev.activities||[]).find(a=>a.id===t.actId):null;
+  const day=ev?(ev.days||[]).find(d=>d.id===t.dayId):null;
+  document.getElementById('task-detail-title').textContent = t.name;
+  document.getElementById('task-detail-body').innerHTML = `
+    <div class="task-meta" style="margin-bottom:14px;">
+      ${aNames.map(n=>`<span class="badge badge-purple">${n}</span>`).join('')}
+      ${act?`<span class="badge badge-blue">${act.name}</span>`:''}
+      ${day?`<span class="badge badge-pink">${day.label}</span>`:''}
+    </div>
+    ${t.time?`<div style="font-size:13px;color:var(--muted2);margin-bottom:8px;">⏰ ${t.time}</div>`:''}
+    ${t.location?`<div style="font-size:13px;color:var(--muted2);margin-bottom:8px;">📍 ${t.location}</div>`:''}
+    ${t.note?`<div style="font-size:13px;color:var(--muted2);margin-bottom:14px;background:var(--card2);padding:10px;border-radius:8px;">${t.note}</div>`:''}
+    <div class="divider"></div>
+    <select class="status-select" data-s="${t.status}" onchange="updTaskStatus('${t.id}',this.value,this);renderTasks();" style="margin-bottom:12px;">
+      <option value="pending" ${t.status==='pending'?'selected':''}>${tr('status.pending_icon')}</option>
+      <option value="inprogress" ${t.status==='inprogress'?'selected':''}>${tr('status.inprogress_icon')}</option>
+      <option value="done" ${t.status==='done'?'selected':''}>${tr('status.done_icon')}</option>
+      <option value="blocked" ${t.status==='blocked'?'selected':''}>${tr('status.blocked_icon')}</option>
+    </select>
+    <button class="btn btn-danger btn-full" onclick="delTask('${t.id}');closeModal('modal-task-detail');">🗑 מחק משימה</button>
+  `;
+  openModal('modal-task-detail');
+}
+
+function detectConflicts() {
+  const byTime={};
+  getTasks().forEach(t=>{
+    const key=(t.dayId||'')+'_'+(t.time||'');
+    (t.assignees||[]).forEach(aid=>{
+      if(!byTime[key]) byTime[key]={};
+      byTime[key][aid]=(byTime[key][aid]||0)+1;
+    });
+  });
+  const out=[];
+  Object.entries(byTime).forEach(([key,am])=>{
+    Object.entries(am).forEach(([aid,cnt])=>{
+      if(cnt>1){const m=getMembers().find(m=>m.id===aid);const time=key.split('_')[1];if(m)out.push({name:m.name,count:cnt,time});}
+    });
+  });
+  return out;
+}
+
+function setTFilter(f){taskFilter=f;renderTasks();}
+function setTDay(id){taskDayId=id;renderTasks();}
+function updTaskStatus(id,s,sel){const t=getTasks().find(t=>t.id===id);if(t){t.status=s;sel.dataset.s=s;save();}}
+function delTask(id){
+  confirm2('✅','מחיקת משימה','למחוק משימה זו?','מחק',()=>{
+    getEv().tasks=getTasks().filter(t=>t.id!==id);save();renderTasks();renderSchedule();
+  });
+}
+
+function populateTaskModal(task) {
+  const ev=getEv(); const pre=S._prefill||{};
+  document.getElementById('task-edit-id').value = task?task.id:'';
+  document.getElementById('task-modal-title').textContent = task?'✏️ עריכת משימה':'✅ הוסף משימה';
+  document.getElementById('task-modal-btn').textContent = task?'שמור שינויים':'שמור משימה';
+
+  document.getElementById('task-assignees-list').innerHTML=getMembers().map(m=>`
+    <label style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:6px;cursor:pointer;margin-bottom:4px;background:rgba(255,255,255,0.03);">
+      <input type="checkbox" value="${m.id}" class="tach" ${task?(task.assignees||[]).includes(m.id)?'checked':'':pre.assigneeId===m.id?'checked':''} />
+      <span class="avatar ${m.av}" style="width:28px;height:28px;font-size:11px;">${m.name[0]}</span>
+      <span style="font-size:13px;">${m.name}</span>
+      <span style="font-size:11px;color:var(--muted);">${m.role}</span>
+    </label>`).join('');
+
+  const actSel=document.getElementById('task-activity');
+  actSel.innerHTML='<option value="">— לא מקושר —</option>';
+  (ev?.activities||[]).forEach(a=>{
+    const day=(ev?.days||[]).find(d=>d.id===a.dayId);
+    const sel = task?task.actId===a.id:pre.actId===a.id;
+    actSel.innerHTML+=`<option value="${a.id}" ${sel?'selected':''}>${day?.label||''} | ${a.start} ${a.name}</option>`;
+  });
+
+  const daySel=document.getElementById('task-day-sel');
+  daySel.innerHTML='<option value="">— בחר יום —</option>';
+  (ev?.days||[]).forEach(d=>{
+    const sel = task?task.dayId===d.id:pre.dayId===d.id;
+    daySel.innerHTML+=`<option value="${d.id}" ${sel?'selected':''}>${d.label} (${d.date})</option>`;
+  });
+
+  document.getElementById('task-name').value = task?task.name:'';
+  document.getElementById('task-note').value = task?task.note||'':'';
+  document.getElementById('task-location').value = task?task.location||'':'';
+  document.getElementById('task-time').value = task?task.time||'09:00':'09:00';
+
+  // Dependencies list
+  const currentId = task?.id;
+  const otherTasks = getTasks().filter(t=>t.id!==currentId);
+  const depEl = document.getElementById('task-deps-list');
+  if(!otherTasks.length) {
+    depEl.innerHTML='<div style="color:var(--muted);font-size:12px;padding:4px;">אין משימות אחרות עדיין</div>';
+  } else {
+    depEl.innerHTML = otherTasks.map(t=>`
+      <label style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:5px;cursor:pointer;margin-bottom:1px;">
+        <input type="checkbox" value="${t.id}" class="tdep" ${task&&(task.blockedBy||[]).includes(t.id)?'checked':''} />
+        <span class="status-dot" style="background:${sColor(t.status)}"></span>
+        <span style="font-size:12px;flex:1;">${t.name}</span>
+        <span style="font-size:10px;color:var(--muted);">${t.time||''}</span>
+      </label>`).join('');
+  }
+}
+
+function editTask(id) {
+  const t=getTasks().find(t=>t.id===id); if(!t) return;
+  S._prefill=null;
+  populateTaskModal(t);
+  document.getElementById('modal-add-task').classList.add('open');
+}
+
+function goToEditTask(id) {
+  goTab('tasks');
+  setTimeout(()=>editTask(id), 50);
+}
+
+function saveTask() {
+  const name=document.getElementById('task-name').value.trim();
+  if(!name){alert('נא להזין שם משימה');return;}
+  const assignees=[...document.querySelectorAll('.tach:checked')].map(c=>c.value);
+  const editId=document.getElementById('task-edit-id').value;
+  const blockedBy=[...document.querySelectorAll('.tdep:checked')].map(c=>c.value);
+  const data={
+    name,assignees,
+    actId:document.getElementById('task-activity').value||null,
+    dayId:document.getElementById('task-day-sel').value||null,
+    time:document.getElementById('task-time').value,
+    location:document.getElementById('task-location').value.trim(),
+    note:document.getElementById('task-note').value.trim(),
+    blockedBy,
+  };
+  if(editId) {
+    const t=getTasks().find(t=>t.id===editId); if(!t) return;
+    Object.assign(t,data);
+  } else {
+    getTasks().push({id:'t'+Date.now(),...data,status:'pending'});
+  }
+  S._prefill=null; save(); closeModal('modal-add-task');
+  renderTasks(); renderSchedule();
+}
+
+// ===================== TEAM =====================
+const AVC=['av1','av2','av3','av4','av5','av6','av7','av8'];
+function renderTeam() {
+  const members = getMembers();
+  const teamMembers = members.filter(m=>m.type!=='vendor');
+  const vendors = members.filter(m=>m.type==='vendor');
+  document.getElementById('team-count').textContent = `${teamMembers.length} צוות הפקה · ${vendors.length} ספקים`;
+  const el=document.getElementById('team-list');
+  if(!members.length){el.innerHTML=`<div class="empty"><div class="empty-icon">👥</div><div class="empty-title">${tr('team.none')}</div></div>`;return;}
+  const sC={available:'status-available',busy:'status-busy',break:'status-break'};
+  const sL={available:tr('team.available'),busy:tr('team.busy'),break:tr('team.break')};
+
+  function memberCard(m) {
+    const myT=getTasks().filter(t=>(t.assignees||[]).includes(m.id));
+    const done=myT.filter(t=>t.status==='done').length;
+    const pct=myT.length?Math.round(done/myT.length*100):0;
+    let inviteHtml='';
+    if(!m.inviteStatus) inviteHtml=`<button class="invite-btn" onclick="inviteMember('${m.id}');event.stopPropagation()">${tr('team.invite')}</button>`;
+    else if(m.inviteStatus==='pending') inviteHtml=`<button class="invite-pending" onclick="confirmMember('${m.id}');event.stopPropagation()">${tr('team.pending')}</button>`;
+    else inviteHtml=`<span class="invite-confirmed">${tr('team.confirmed')}</span>`;
+    return `<div class="member-card" onclick="openDetail('${m.id}')">
+      <div class="member-info">
+        <div class="avatar ${m.av}">${m.name[0]}</div>
+        <div>
+          <div class="member-name">${m.name}</div>
+          <div class="member-role">${m.role} · ${m.phone||'—'}</div>
+          <div class="prog-bar" style="width:110px;"><div class="prog-fill" style="width:${pct}%"></div></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+            <span style="font-size:10px;color:var(--muted);">${done}/${myT.length} ${tr('team.tasks')}</span>
+            <button onclick="openFieldPreview('${m.id}');event.stopPropagation()" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;">👁 שטח</button>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        ${inviteHtml}
+        <span class="member-status ${sC[m.status]||'status-available'}">${sL[m.status]||m.status}</span>
+        <select style="background:var(--card2);border:1px solid var(--border2);color:var(--muted);border-radius:6px;padding:4px;font-size:11px;" onchange="updMemStatus('${m.id}',this.value)" onclick="event.stopPropagation()">
+          <option value="available" ${m.status==='available'?'selected':''}>${tr('team.available')}</option>
+          <option value="busy" ${m.status==='busy'?'selected':''}>${tr('team.busy')}</option>
+          <option value="break" ${m.status==='break'?'selected':''}>${tr('team.break')}</option>
+        </select>
+      </div>
+    </div>`;
+  }
+
+  let html='';
+  if(teamMembers.length) {
+    html+=`<div class="team-section-header">${tr('team.production')} (${teamMembers.length})</div>`;
+    html+=teamMembers.map(memberCard).join('');
+  }
+  if(vendors.length) {
+    html+=`<div class="team-section-header">${tr('team.vendors')} (${vendors.length})</div>`;
+    html+=vendors.map(memberCard).join('');
+  }
+  el.innerHTML=html;
+}
+
+function updMemStatus(id,s){const m=getMembers().find(m=>m.id===id);if(m){m.status=s;save();renderTeam();}}
+
+function openDetail(id) {
+  const m=getMembers().find(m=>m.id===id); if(!m) return;
+  document.getElementById('detail-name').innerHTML=`${m.name} · ${m.role} <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;${m.type==='vendor'?'background:rgba(232,92,168,0.15);color:var(--pink)':'background:rgba(59,154,236,0.15);color:var(--blue)'}">${m.type==='vendor'?'ספק':'צוות הפקה'}</span>`;
+  const myT=getTasks().filter(t=>(t.assignees||[]).includes(m.id));
+  const ev=getEv();
+  const sL={pending:'ממתין',inprogress:'בביצוע',done:'הושלם',blocked:'חסום'};
+  document.getElementById('detail-body').innerHTML=`
+    <div class="grid-3" style="margin-bottom:16px;">
+      <div class="stat-card"><div class="stat-num" style="font-size:22px;">${myT.length}</div><div class="stat-label">משימות</div></div>
+      <div class="stat-card"><div class="stat-num" style="font-size:22px;color:var(--green)">${myT.filter(t=>t.status==='done').length}</div><div class="stat-label">הושלמו</div></div>
+      <div class="stat-card"><div class="stat-num" style="font-size:22px;color:var(--red)">${myT.filter(t=>t.status==='blocked').length}</div><div class="stat-label">חסומות</div></div>
+    </div>
+    <div style="height:1px;background:var(--border);margin-bottom:14px;"></div>
+    ${!myT.length?'<div style="color:var(--muted);font-size:13px;margin-bottom:14px;">אין משימות</div>':
+      myT.map(t=>{
+        const day=ev?(ev.days||[]).find(d=>d.id===t.dayId):null;
+        return `<div class="task-item" style="border-right:3px solid ${sColor(t.status)}">
+          <div class="task-header"><div class="task-title">${t.name}</div><div class="task-time">${t.time}</div></div>
+          <div class="task-meta">${day?`<span class="badge badge-pink">${day.label}</span>`:''} <span class="badge badge-green">${sL[t.status]||t.status}</span></div>
+        </div>`;
+      }).join('')
+    }
+    <div style="height:1px;background:var(--border);margin:14px 0;"></div>
+    <button class="btn btn-primary btn-full" onclick="qAddTaskMem('${m.id}');closeModal('modal-member-detail')">+ הוסף משימה לחבר זה</button>
+    <button class="btn btn-ghost btn-full" style="margin-top:8px;" onclick="openDM('${m.id}');closeModal('modal-member-detail')">💬 שלח הודעה</button>
+    ${!m.inviteStatus ? `<button class="btn btn-ghost btn-full" style="margin-top:8px;" onclick="inviteMember('${m.id}');closeModal('modal-member-detail')">📩 שלח הזמנה</button>` : ''}
+    ${m.inviteStatus==='pending' ? `<button class="btn btn-ghost btn-full" style="margin-top:8px;" onclick="closeModal('modal-member-detail');confirmMember('${m.id}')">✅ אשר הצטרפות</button>` : ''}
+    <button class="btn btn-danger btn-full" style="margin-top:8px;" onclick="removeMem('${m.id}');closeModal('modal-member-detail')">🗑 הסר מהצוות</button>
+  `;
+  openModal('modal-member-detail');
+}
+
+function qAddTaskMem(mid) {
+  S._prefill={assigneeId:mid}; openModal('modal-add-task');
+  setTimeout(()=>document.querySelectorAll('.tach').forEach(c=>{if(c.value===mid)c.checked=true;}),50);
+}
+function removeMem(id) {
+  confirm2('👤','הסרת חבר צוות','להסיר חבר זה מהצוות?','הסר',()=>{
+    getEv().members=getMembers().filter(m=>m.id!==id);
+    getEv().tasks=getTasks().map(t=>({...t,assignees:(t.assignees||[]).filter(a=>a!==id)}));
+    save(); renderTeam();
+  });
+}
+function addMember() {
+  const name=document.getElementById('mem-name').value.trim(); if(!name){alert('נא להזין שם');return;}
+  const type=document.querySelector('input[name="mem-type"]:checked')?.value||'team';
+  getMembers().push({id:'m'+Date.now(),name,role:document.getElementById('mem-role').value.trim()||'עוזר הפקה',
+    phone:document.getElementById('mem-phone').value.trim(),status:'available',av:AVC[getMembers().length%AVC.length],type,inviteStatus:null});
+  save(); closeModal('modal-add-member');
+  ['mem-name','mem-role','mem-phone'].forEach(id=>document.getElementById(id).value='');
+  // Reset type to team
+  const teamRadio=document.querySelector('input[name="mem-type"][value="team"]');
+  if(teamRadio) teamRadio.checked=true;
+  renderTeam();
+}
+
+function inviteMember(id) {
+  const m=getMembers().find(m=>m.id===id); if(!m) return;
+  m.inviteStatus='pending';
+  save(); renderTeam();
+}
+
+function confirmMember(id) {
+  const m=getMembers().find(m=>m.id===id); if(!m) return;
+  confirm2('✅','אישור הצטרפות',`לסמן את "${m.name}" כמאושר/ת?`,'אשר',()=>{
+    m.inviteStatus='confirmed'; save(); renderTeam();
+  });
+}
+
+// ===================== CHAT =====================
+let activeCh='group';
+function renderChat() {
+  document.getElementById('dm-chips').innerHTML=getMembers().map(m=>`
+    <div class="filter-chip ${activeCh===m.id?'active':''}" onclick="selectCh(this,'${m.id}')" data-ch="${m.id}">${m.name}</div>`).join('');
+  renderMsgs();
+}
+function selectCh(el,ch) {
+  activeCh=ch;
+  document.querySelectorAll('#tab-chat .filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.ch===ch));
+  renderMsgs();
+}
+function openDM(mid) {
+  goTab('chat');
+  setTimeout(()=>{
+    activeCh=mid;
+    document.querySelectorAll('#tab-chat .filter-chip').forEach(c=>c.classList.toggle('active',c.dataset.ch===mid));
+    renderMsgs();
+  },100);
+}
+function renderMsgs() {
+  if(!getChats()[activeCh]) getChats()[activeCh]=[];
+  const msgs=getChats()[activeCh];
+  const el=document.getElementById('chat-messages');
+  if(!msgs.length){el.innerHTML='<div class="empty"><div class="empty-icon">💬</div><div class="empty-title">אין הודעות עדיין</div></div>';return;}
+  el.innerHTML=msgs.map(m=>`
+    <div class="chat-msg ${m.mine?'mine':'theirs'}">
+      ${!m.mine?`<div class="chat-sender">${m.sender}</div>`:''}
+      ${m.text}
+      <div class="chat-time">${m.time}</div>
+    </div>`).join('');
+  el.scrollTop=el.scrollHeight;
+}
+function sendMsg() {
+  const input=document.getElementById('chat-input');
+  const text=input.value.trim(); if(!text) return;
+  if(!getChats()[activeCh]) getChats()[activeCh]=[];
+  const now=new Date();
+  const time=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+  getChats()[activeCh].push({sender:'מנהל הפקה',text,time,mine:true});
+  save(); input.value=''; renderMsgs();
+}
+
+// ===================== MODALS =====================
+function openModal(id) {
+  if(id==='modal-add-activity' && !document.getElementById('act-edit-id').value) {
+    document.getElementById('act-modal-title').textContent='🎯 הוסף פעילות';
+    document.getElementById('act-modal-btn').textContent='הוסף פעילות';
+    populateActDaySel(scheduleDayId||'');
+    document.getElementById('act-name').value=''; document.getElementById('act-location').value='';
+  }
+  if(id==='modal-add-task') populateTaskModal();
+  if(id==='modal-new-event' && !document.getElementById('ev-edit-id').value) {
+    document.getElementById('event-modal-title').textContent='✨ צור אירוע חדש';
+    document.getElementById('event-modal-btn').textContent='צור אירוע';
+  }
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  if(id==='modal-add-activity') document.getElementById('act-edit-id').value='';
+  if(id==='modal-new-event') document.getElementById('ev-edit-id').value='';
+  if(id==='modal-field-preview') document.getElementById('field-preview-iframe').src='';
+}
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
+
+// ===================== INIT =====================
+window.addEventListener('load',()=>{
+  if(initFieldApp()) return; // field mode — stop here
+  document.getElementById('current-event-name').textContent=getEv()?.name||'—';
+  updateAvatar();
+  applyLang();
+  // Hook FAB for events tab
+  document.querySelector('#tab-events .fab').onclick = openNewEvent;
+  goTab('events');
+  setTimeout(()=>{
+    const sp=document.getElementById('splash');
+    sp.style.opacity='0';
+    setTimeout(()=>sp.remove(),500);
+  },1800);
+});
+
+// ===================== FIELD APP =====================
+const FIELD_TABS = ['schedule','tasks','chat'];
+let fieldTab = 'tasks', fieldDayId = null, fieldMemberId = null;
+
+function initFieldApp() {
+  const params = new URLSearchParams(location.search);
+  if(params.get('mode') !== 'field') return false;
+  fieldMemberId = params.get('member') || null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('splash').style.display = 'none';
+  const fa = document.getElementById('field-app');
+  fa.style.display = 'flex';
+  renderFieldApp();
+  return true;
+}
+
+function getFieldMember() {
+  if(!fieldMemberId) return null;
+  return getMembers().find(m=>m.id===fieldMemberId) || null;
+}
+
+function getFieldTasks() {
+  const tasks = getTasks();
+  if(!fieldMemberId) return tasks;
+  return tasks.filter(t=>(t.assignees||[]).includes(fieldMemberId));
+}
+
+function renderFieldApp() {
+  const ev = getEv(); if(!ev) return;
+  const member = getFieldMember();
+  const av = member ? member.av : 'av1';
+  const initials = member ? member.name[0] : '?';
+  const fa = document.getElementById('field-app');
+
+  fa.innerHTML = `
+    <!-- Header -->
+    <div class="field-header">
+      <img class="field-header-logo" src="logos/Eventask-logo.png" onerror="this.style.display='none'" />
+      <div class="field-header-info">
+        <div class="field-header-event">${ev.name}</div>
+        <div class="field-header-name">${member ? member.name+' · '+member.role : 'צוות שטח'}</div>
+      </div>
+      <div class="field-header-avatar ${av}" style="cursor:pointer;" onclick="window.location.href=location.pathname" title="חזרה לאדמין">${initials}</div>
+    </div>
+
+    <!-- Content area -->
+    <div class="field-content" id="field-content"></div>
+
+    <!-- Bottom nav -->
+    <nav class="field-bottom-nav">
+      <button class="field-nav-btn ${fieldTab==='schedule'?'active':''}" onclick="setFieldTab('schedule')">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19.5,2h-1.5V.5c0-.276-.224-.5-.5-.5s-.5,.224-.5,.5v1.5H7V.5c0-.276-.224-.5-.5-.5s-.5,.224-.5,.5v1.5h-1.5C2.019,2,0,4.019,0,6.5v13c0,2.481,2.019,4.5,4.5,4.5h15c2.481,0,4.5-2.019,4.5-4.5V6.5c0-2.481-2.019-4.5-4.5-4.5ZM4.5,3h15c1.93,0,3.5,1.57,3.5,3.5v1.5H1v-1.5c0-1.93,1.57-3.5,3.5-3.5Zm15,20H4.5c-1.93,0-3.5-1.57-3.5-3.5V9H23v10.5c0,1.93-1.57,3.5-3.5,3.5Z"/></svg>
+        לו״ז
+      </button>
+      <button class="field-nav-btn ${fieldTab==='tasks'?'active':''}" onclick="setFieldTab('tasks')">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m4 6a2.982 2.982 0 0 1 -2.122-.879l-1.544-1.374a1 1 0 0 1 1.332-1.494l1.585 1.414a1 1 0 0 0 1.456.04l3.604-3.431a1 1 0 0 1 1.378 1.448l-3.589 3.414a2.964 2.964 0 0 1 -2.1.862zm20-2a1 1 0 0 0 -1-1h-10a1 1 0 0 0 0 2h10a1 1 0 0 0 1-1zm-17.9 9.138 3.589-3.414a1 1 0 1 0 -1.378-1.448l-3.6 3.431a1.023 1.023 0 0 1 -1.414 0l-1.59-1.585a1 1 0 0 0 -1.414 1.414l1.585 1.585a3 3 0 0 0 4.226.017zm17.9-1.138a1 1 0 0 0 -1-1h-10a1 1 0 0 0 0 2h10a1 1 0 0 0 1-1zm-17.9 9.138 3.585-3.414a1 1 0 1 0 -1.378-1.448l-3.6 3.431a1 1 0 0 1 -1.456-.04l-1.585-1.414a1 1 0 0 0 -1.332 1.494l1.544 1.374a3 3 0 0 0 4.226.017zm17.9-1.138a1 1 0 0 0 -1-1h-10a1 1 0 0 0 0 2h10a1 1 0 0 0 1-1z"/></svg>
+        משימות
+      </button>
+      <button class="field-nav-btn ${fieldTab==='chat'?'active':''}" onclick="setFieldTab('chat')">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M24,11.247A12.012,12.012,0,1,0,12.017,24H19a5.005,5.005,0,0,0,5-5V11.247ZM22,19a3,3,0,0,1-3,3H12.017a10.041,10.041,0,0,1-7.476-3.343,9.917,9.917,0,0,1-2.476-7.814,10.043,10.043,0,0,1,8.656-8.761A10.564,10.564,0,0,1,12.021,2,9.921,9.921,0,0,1,18.4,4.3,10.041,10.041,0,0,1,22,11.342Z"/><path d="M8,9h4a1,1,0,0,0,0-2H8A1,1,0,0,0,8,9Z"/><path d="M16,11H8a1,1,0,0,0,0,2h8a1,1,0,0,0,0-2Z"/><path d="M16,15H8a1,1,0,0,0,0,2h8a1,1,0,0,0,0-2Z"/></svg>
+        צ'אט
+      </button>
+    </nav>
+  `;
+  renderFieldContent();
+}
+
+function setFieldTab(tab) {
+  fieldTab = tab;
+  fieldDayId = null;
+  renderFieldApp();
+}
+
+function renderFieldContent() {
+  if(fieldTab==='schedule') renderFieldSchedule();
+  else if(fieldTab==='tasks') renderFieldTasks();
+  else renderFieldChat();
+}
+
+function renderFieldSchedule() {
+  const ev = getEv(); if(!ev) return;
+  const el = document.getElementById('field-content'); if(!el) return;
+  const days = ev.days||[];
+
+  let dayTabsHtml = `<div class="field-day-tabs">
+    <div class="field-day-tab ${!fieldDayId?'active':''}" onclick="setFieldDay(null)">הכל</div>
+    ${days.map(d=>`<div class="field-day-tab ${fieldDayId===d.id?'active':''}" onclick="setFieldDay('${d.id}')">${d.label.split('—')[0].trim()}</div>`).join('')}
+  </div>`;
+
+  const filteredDays = fieldDayId ? days.filter(d=>d.id===fieldDayId) : days;
+
+  if(!filteredDays.length) {
+    el.innerHTML = dayTabsHtml + `<div class="field-empty"><div class="field-empty-icon">📅</div><div class="field-empty-title">אין ימים בלו״ז</div></div>`;
+    return;
+  }
+
+  let html = dayTabsHtml;
+  filteredDays.forEach(d=>{
+    const acts = (ev.activities||[]).filter(a=>a.dayId===d.id).sort((a,b)=>a.start.localeCompare(b.start));
+    if(!acts.length) return;
+    html += `<div class="field-section-label">📅 ${d.label}</div>`;
+    acts.forEach(a=>{
+      const myTasks = getFieldTasks().filter(t=>t.actId===a.id);
+      html += `<div class="field-act-card ${a.goLive?'go-live':''}">
+        <div class="field-act-time">${a.start} – ${a.end}</div>
+        <div class="field-act-name">
+          ${a.goLive?'<span style="background:linear-gradient(135deg,#16a34a,#22c55e);color:white;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:800;margin-left:8px;">🚀 GO LIVE</span>':''}
+          ${a.name}
+        </div>
+        ${a.location?`<div class="field-act-meta">📍 ${a.location}</div>`:''}
+        ${myTasks.length?`<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;">
+          ${myTasks.map(t=>`<span onclick="setFieldTab('tasks')" style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.06);border:1px solid var(--border2);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;">
+            <span style="width:7px;height:7px;border-radius:50%;background:${sColor(t.status)};flex-shrink:0;"></span>${t.name}
+          </span>`).join('')}
+        </div>`:''}
+      </div>`;
+    });
+  });
+  el.innerHTML = html;
+}
+
+function setFieldDay(id) { fieldDayId=id; renderFieldContent(); }
+
+function renderFieldTasks() {
+  const el = document.getElementById('field-content'); if(!el) return;
+  const ev = getEv();
+  const days = ev?.days||[];
+
+  let dayTabsHtml = `<div class="field-day-tabs">
+    <div class="field-day-tab ${!fieldDayId?'active':''}" onclick="setFieldDay(null)">הכל</div>
+    ${days.map(d=>`<div class="field-day-tab ${fieldDayId===d.id?'active':''}" onclick="setFieldDay('${d.id}')">${d.label.split('—')[0].trim()}</div>`).join('')}
+  </div>`;
+
+  let tasks = getFieldTasks();
+  if(fieldDayId) tasks = tasks.filter(t=>t.dayId===fieldDayId);
+  tasks = tasks.sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+
+  if(!tasks.length) {
+    el.innerHTML = dayTabsHtml + `<div class="field-empty"><div class="field-empty-icon">✅</div><div class="field-empty-title">${fieldMemberId?'אין משימות מוקצות לך':'אין משימות'}</div></div>`;
+    return;
+  }
+
+  const statusBtns = [
+    {s:'pending',  label:'⏳ ממתין',    cls:'active-pending'},
+    {s:'inprogress',label:'🔄 בביצוע',  cls:'active-inprogress'},
+    {s:'done',     label:'✅ הושלם',    cls:'active-done'},
+    {s:'blocked',  label:'🚫 חסום',     cls:'active-blocked'},
+  ];
+
+  let html = dayTabsHtml;
+  tasks.forEach(t=>{
+    const act = (ev?.activities||[]).find(a=>a.id===t.actId);
+    const day = days.find(d=>d.id===t.dayId);
+    html += `<div class="field-task-card" style="border-right-color:${sColor(t.status)};" id="ftask-${t.id}">
+      <div class="field-task-name">${t.name}</div>
+      <div class="field-task-meta">
+        ${t.time?`<span>⏰ ${t.time}</span>`:''}
+        ${act?`<span>🎯 ${act.name}</span>`:''}
+        ${day?`<span>📅 ${day.label.split('—')[0].trim()}</span>`:''}
+        ${t.location?`<span>📍 ${t.location}</span>`:''}
+      </div>
+      ${t.note?`<div style="font-size:13px;color:var(--muted2);background:rgba(255,255,255,0.03);padding:10px;border-radius:8px;margin-bottom:12px;">${t.note}</div>`:''}
+      <div class="field-status-grid">
+        ${statusBtns.map(b=>`<button class="field-status-btn ${t.status===b.s?b.cls:''}" onclick="fieldUpdStatus('${t.id}','${b.s}')">${b.label}</button>`).join('')}
+      </div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+function fieldUpdStatus(taskId, status) {
+  const t = getTasks().find(t=>t.id===taskId); if(!t) return;
+  t.status = status; save();
+  const card = document.getElementById('ftask-'+taskId);
+  if(!card) return;
+  card.style.borderRightColor = sColor(status);
+  const clsMap = {pending:'active-pending',inprogress:'active-inprogress',done:'active-done',blocked:'active-blocked'};
+  card.querySelectorAll('.field-status-btn').forEach(btn=>{
+    const s = btn.getAttribute('onclick').match(/'([^']+)'$/)?.[1];
+    const isActive = s===status;
+    btn.className = 'field-status-btn' + (isActive ? ' '+clsMap[s] : '');
+    if(isActive) {
+      btn.classList.remove('pop');
+      void btn.offsetWidth; // force reflow so animation re-triggers
+      btn.classList.add('pop');
+    }
+  });
+}
+
+function renderFieldChat() {
+  const el = document.getElementById('field-content'); if(!el) return;
+  const chats = getChats();
+  const msgs = chats.group || [];
+  const member = getFieldMember();
+  const senderName = member ? member.name : 'שטח';
+
+  el.innerHTML = `<div class="field-chat-wrap">
+    <div class="field-chat-msgs" id="field-chat-msgs">
+      ${!msgs.length ? `<div class="field-empty"><div class="field-empty-icon">💬</div><div class="field-empty-title">אין הודעות עדיין</div></div>` :
+        msgs.map(m=>`<div class="chat-msg ${m.mine||m.sender===senderName?'mine':'theirs'}">
+          ${!m.mine&&m.sender!==senderName?`<div class="chat-sender">${m.sender}</div>`:''}
+          ${m.text}
+          <div class="chat-time">${m.time}</div>
+        </div>`).join('')}
+    </div>
+    <div class="field-chat-input-row">
+      <input class="chat-input" id="field-chat-input" placeholder="כתוב הודעה..." onkeydown="if(event.key==='Enter') fieldSendMsg()" style="font-size:16px;" />
+      <button class="chat-send-btn" onclick="fieldSendMsg()" style="width:48px;height:48px;font-size:20px;">➤</button>
+    </div>
+  </div>`;
+  const msgsEl = document.getElementById('field-chat-msgs');
+  if(msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
+function fieldSendMsg() {
+  const input = document.getElementById('field-chat-input'); if(!input) return;
+  const text = input.value.trim(); if(!text) return;
+  const member = getFieldMember();
+  const senderName = member ? member.name : 'שטח';
+  const chats = getChats();
+  if(!chats.group) chats.group=[];
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+  chats.group.push({sender:senderName, text, time, mine:false});
+  save(); input.value=''; renderFieldChat();
+}
+
+function openFieldPreview(memberId) {
+  const url = location.href.split('?')[0] + '?mode=field&member=' + memberId;
+  document.getElementById('field-preview-iframe').src = url;
+  document.getElementById('modal-field-preview').classList.add('open');
+}
+
+function closeFieldPreview() {
+  document.getElementById('field-preview-iframe').src = '';
+  closeModal('modal-field-preview');
+}
+
+</script>
+
+<!-- FIELD APP -->
+<div id="field-app"></div>
+
+</body>
+</html>
