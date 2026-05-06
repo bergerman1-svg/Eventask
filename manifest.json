@@ -1,0 +1,35 @@
+{
+  "name": "Eventask",
+  "short_name": "Eventask",
+  "description": "מערכת לניהול צוותי הפקה",
+  "id": "/Eventask/",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0b0d",
+  "theme_color": "#7c5bf9",
+  "lang": "he",
+  "dir": "rtl",
+  "categories": ["productivity", "business"],
+  "icons": [
+    {
+      "src": "Eventask-logo-social.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "Eventask-logo-social.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "Eventask-logo-social.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
